@@ -153,6 +153,16 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 	return &walletrpc.RawTransaction{Data: txBytes}, nil
 }
 
+// GetLightdInfo gets the LightWalletD (this server) info
+func (s *SqlStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.SendResponse, error) {
+	// TODO these are called Error but they aren't at the moment.
+	// A success will return code 0 and message txhash.
+	return &walletrpc.SendResponse{
+		ErrorCode:    int32(0),
+		ErrorMessage: "Go Light Server",
+	}, nil
+}
+
 // SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
 func (s *SqlStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
 	// sendrawtransaction "hexstring" ( allowhighfees )

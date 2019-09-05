@@ -3,9 +3,11 @@
 
 package walletrpc
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
+import (
+	fmt "fmt"
+	proto "github.com/golang/protobuf/proto"
+	math "math"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -16,7 +18,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 // CompactBlock is a packaging of ONLY the data from a block that's needed to:
 //   1. Detect a payment to your shielded Sapling address
@@ -39,16 +41,17 @@ func (m *CompactBlock) Reset()         { *m = CompactBlock{} }
 func (m *CompactBlock) String() string { return proto.CompactTextString(m) }
 func (*CompactBlock) ProtoMessage()    {}
 func (*CompactBlock) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_a15b2a7f016abebd, []int{0}
+	return fileDescriptor_dce29fee3ee34899, []int{0}
 }
+
 func (m *CompactBlock) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactBlock.Unmarshal(m, b)
 }
 func (m *CompactBlock) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CompactBlock.Marshal(b, m, deterministic)
 }
-func (dst *CompactBlock) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CompactBlock.Merge(dst, src)
+func (m *CompactBlock) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CompactBlock.Merge(m, src)
 }
 func (m *CompactBlock) XXX_Size() int {
 	return xxx_messageInfo_CompactBlock.Size(m)
@@ -131,16 +134,17 @@ func (m *CompactTx) Reset()         { *m = CompactTx{} }
 func (m *CompactTx) String() string { return proto.CompactTextString(m) }
 func (*CompactTx) ProtoMessage()    {}
 func (*CompactTx) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_a15b2a7f016abebd, []int{1}
+	return fileDescriptor_dce29fee3ee34899, []int{1}
 }
+
 func (m *CompactTx) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactTx.Unmarshal(m, b)
 }
 func (m *CompactTx) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CompactTx.Marshal(b, m, deterministic)
 }
-func (dst *CompactTx) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CompactTx.Merge(dst, src)
+func (m *CompactTx) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CompactTx.Merge(m, src)
 }
 func (m *CompactTx) XXX_Size() int {
 	return xxx_messageInfo_CompactTx.Size(m)
@@ -197,16 +201,17 @@ func (m *CompactSpend) Reset()         { *m = CompactSpend{} }
 func (m *CompactSpend) String() string { return proto.CompactTextString(m) }
 func (*CompactSpend) ProtoMessage()    {}
 func (*CompactSpend) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_a15b2a7f016abebd, []int{2}
+	return fileDescriptor_dce29fee3ee34899, []int{2}
 }
+
 func (m *CompactSpend) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactSpend.Unmarshal(m, b)
 }
 func (m *CompactSpend) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CompactSpend.Marshal(b, m, deterministic)
 }
-func (dst *CompactSpend) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CompactSpend.Merge(dst, src)
+func (m *CompactSpend) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CompactSpend.Merge(m, src)
 }
 func (m *CompactSpend) XXX_Size() int {
 	return xxx_messageInfo_CompactSpend.Size(m)
@@ -237,16 +242,17 @@ func (m *CompactOutput) Reset()         { *m = CompactOutput{} }
 func (m *CompactOutput) String() string { return proto.CompactTextString(m) }
 func (*CompactOutput) ProtoMessage()    {}
 func (*CompactOutput) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_a15b2a7f016abebd, []int{3}
+	return fileDescriptor_dce29fee3ee34899, []int{3}
 }
+
 func (m *CompactOutput) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactOutput.Unmarshal(m, b)
 }
 func (m *CompactOutput) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CompactOutput.Marshal(b, m, deterministic)
 }
-func (dst *CompactOutput) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CompactOutput.Merge(dst, src)
+func (m *CompactOutput) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CompactOutput.Merge(m, src)
 }
 func (m *CompactOutput) XXX_Size() int {
 	return xxx_messageInfo_CompactOutput.Size(m)
@@ -285,11 +291,9 @@ func init() {
 	proto.RegisterType((*CompactOutput)(nil), "cash.z.wallet.sdk.rpc.CompactOutput")
 }
 
-func init() {
-	proto.RegisterFile("compact_formats.proto", fileDescriptor_compact_formats_a15b2a7f016abebd)
-}
+func init() { proto.RegisterFile("compact_formats.proto", fileDescriptor_dce29fee3ee34899) }
 
-var fileDescriptor_compact_formats_a15b2a7f016abebd = []byte{
+var fileDescriptor_dce29fee3ee34899 = []byte{
 	// 346 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x7c, 0x51, 0xbf, 0x4e, 0xf3, 0x30,
 	0x1c, 0x54, 0xfe, 0x34, 0xfd, 0xfa, 0x6b, 0xfa, 0x09, 0x59, 0x14, 0x59, 0x0c, 0x55, 0x14, 0x18,
