@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/adityapk00/btcd/rpcclient"
 	"github.com/golang/protobuf/proto"
 	"github.com/sirupsen/logrus"
 

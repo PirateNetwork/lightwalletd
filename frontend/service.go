@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/adityapk00/btcd/rpcclient"
 	"github.com/golang/protobuf/proto"
 
 	// blank import for sqlite driver support
@@ -86,6 +86,12 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 	return cBlock, err
 }
 
+func (s *SqlStreamer) GetUtxos(address *walletrpc.TransparentAddress, resp walletrpc.CompactTxStreamer_GetUtxosServer) error {
+	s.client.GetAddressUtxos("someaddress")
+
+	return nil
+}
+
 func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
 	blockChan := make(chan []byte)
 	errChan := make(chan error)
@@ -154,12 +160,13 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 }
 
 // GetLightdInfo gets the LightWalletD (this server) info
-func (s *SqlStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.SendResponse, error) {
+func (s *SqlStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
 	// TODO these are called Error but they aren't at the moment.
 	// A success will return code 0 and message txhash.
-	return &walletrpc.SendResponse{
-		ErrorCode:    int32(0),
-		ErrorMessage: "Go Light Server",
+	return &walletrpc.LightdInfo{
+		Version:      "0.1-zeclightd",
+		Vendor:       "ZecWallet LightWalletD",
+		TaddrSupport: true,
 	}, nil
 }
 
