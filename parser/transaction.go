@@ -4,8 +4,8 @@ import (
 	"crypto/sha256"
 
 	"github.com/pkg/errors"
-	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
-	"github.com/zcash-hackworks/lightwalletd/walletrpc"
+	"github.com/adityapk00/lightwalletd/parser/internal/bytestring"
+	"github.com/adityapk00/lightwalletd/walletrpc"
 )
 
 type rawTransaction struct {

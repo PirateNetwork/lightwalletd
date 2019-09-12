@@ -17,9 +17,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/sirupsen/logrus"
 
-	"github.com/zcash-hackworks/lightwalletd/frontend"
-	"github.com/zcash-hackworks/lightwalletd/parser"
-	"github.com/zcash-hackworks/lightwalletd/storage"
+	"github.com/adityapk00/lightwalletd/frontend"
+	"github.com/adityapk00/lightwalletd/parser"
+	"github.com/adityapk00/lightwalletd/storage"
 )
 
 var log *logrus.Entry

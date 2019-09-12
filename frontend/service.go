@@ -17,8 +17,8 @@ import (
 	// blank import for sqlite driver support
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/zcash-hackworks/lightwalletd/storage"
-	"github.com/zcash-hackworks/lightwalletd/walletrpc"
+	"github.com/adityapk00/lightwalletd/storage"
+	"github.com/adityapk00/lightwalletd/walletrpc"
 )
 
 var (
@@ -91,6 +91,12 @@ func (s *SqlStreamer) GetUtxos(address *walletrpc.TransparentAddress, resp walle
 
 	for _, utxo := range utxos {
 		txid, _ := hex.DecodeString(utxo.TxID)
+		// Txid is read as a string, which is in big-endian order. But when converting
+		// to bytes, it should be little-endian
+		for left, right := 0, len(txid)-1; left < right; left, right = left+1, right-1 {
+			txid[left], txid[right] = txid[right], txid[left]
+		}
+
 		script, _ := hex.DecodeString(utxo.ScriptPubKey)
 
 		respUtxo := &walletrpc.Utxo{

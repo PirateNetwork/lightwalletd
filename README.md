@@ -1,6 +1,6 @@
 # Overview
 
-[lightwalletd](https://github.com/zcash-hackworks/lightwalletd) is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain. Currently, lightwalletd supports the Sapling protocol version as its primary concern. The intended purpose of lightwalletd is to support the development of mobile-friendly shielded light wallets.
+[lightwalletd](https://github.com/adityapk00/lightwalletd) is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain. Currently, lightwalletd supports the Sapling protocol version as its primary concern. The intended purpose of lightwalletd is to support the development of mobile-friendly shielded light wallets.
 
 lightwalletd consists of three loosely coupled components: an "ingester", a "frontend", and an arbitrary storage layer (such as a SQL database) that connects the two. The ingester receives raw block data, parses out the transactions and block metadata, then stores them in a format convenient for the frontend to serve to clients. Thus, these components can operate and scale independently of each other and are connected only by a shared storage convention.
 
@@ -48,7 +48,7 @@ First, install [Go >= 1.11](https://golang.org/dl/#stable). Older versions of Go
 Now clone this repo and start the ingester. The first run will start slow as Go builds the sqlite C interface:
 
 ```
-$ git clone https://github.com/zcash-hackworks/lightwalletd
+$ git clone https://github.com/adityapk00/lightwalletd
 $ cd lightwalletd
 $ go run cmd/ingest/main.go --conf-file <path_to_zcash.conf> --db-path <path_to_sqllightdb>
 ```
@@ -61,7 +61,7 @@ The frontend is the component that talks to clients.
 
 It exposes an API that allows a client to query for current blockheight, request ranges of compact block data, request specific transaction details, and send new Zcash transactions.
 
-The API is specified in [Protocol Buffers](https://developers.google.com/protocol-buffers/) and implemented using [gRPC](https://grpc.io). You can find the exact details in [these files](https://github.com/zcash-hackworks/lightwalletd/tree/master/walletrpc).
+The API is specified in [Protocol Buffers](https://developers.google.com/protocol-buffers/) and implemented using [gRPC](https://grpc.io). You can find the exact details in [these files](https://github.com/adityapk00/lightwalletd/tree/master/walletrpc).
 
 **How do I run it?**
 
@@ -72,7 +72,7 @@ First, install [Go >= 1.11](https://golang.org/dl/#stable). Older versions of Go
 Now clone this repo and start the frontend. The first run will start slow as Go builds the sqlite C interface:
 
 ```
-$ git clone https://github.com/zcash-hackworks/lightwalletd
+$ git clone https://github.com/adityapk00/lightwalletd
 $ cd lightwalletd
 $ go run cmd/server/main.go --db-path <path to the same sqlite db> --bind-addr 0.0.0.0:9067
 ```
@@ -83,13 +83,13 @@ To see the other command line options, run `go run cmd/server/main.go --help`.
 
 Not much! This is a very simple piece of software. Make sure you point it at the same storage as the ingester. See the "Production" section for some caveats.
 
-Support for users sending transactions will require the ability to make JSON-RPC calls to a zcashd instance. By default the frontend tries to pull RPC credentials from your zcashd.conf file, but you can specify other credentials via command line flag. In the future, it should be possible to do this with environment variables [(#2)](https://github.com/zcash-hackworks/lightwalletd/issues/2).
+Support for users sending transactions will require the ability to make JSON-RPC calls to a zcashd instance. By default the frontend tries to pull RPC credentials from your zcashd.conf file, but you can specify other credentials via command line flag. In the future, it should be possible to do this with environment variables [(#2)](https://github.com/adityapk00/lightwalletd/issues/2).
 
 ## Storage
 
 The storage provider is the component that caches compact blocks and their metadata for the frontend to retrieve and serve to clients.
 
-It currently assumes a SQL database. The schema can be found [here](https://github.com/zcash-hackworks/lightwalletd/blob/d53507cc39e8da52e14d08d9c63fee96d3bd16c3/storage/sqlite3.go#L15), but they're extremely provisional. We expect that anyone deploying lightwalletd at scale will adapt it to their own existing data infrastructure.
+It currently assumes a SQL database. The schema can be found [here](https://github.com/adityapk00/lightwalletd/blob/d53507cc39e8da52e14d08d9c63fee96d3bd16c3/storage/sqlite3.go#L15), but they're extremely provisional. We expect that anyone deploying lightwalletd at scale will adapt it to their own existing data infrastructure.
 
 **How do I run it?**
 
@@ -112,7 +112,7 @@ The first-order dependencies of this code are:
 
 **Containers**
 
-This software was designed to be container-friendly! We highly recommend that you package and deploy the software in this manner. We've created an example Docker environment that is likewise new and minimally tested, but it's functional. It lives at [zcash-hackworks/lightwalletd-z-cash](https://github.com/zcash-hackworks/lightwalletd-z-cash).
+This software was designed to be container-friendly! We highly recommend that you package and deploy the software in this manner. We've created an example Docker environment that is likewise new and minimally tested, but it's functional. It lives at [zcash-hackworks/lightwalletd-z-cash](https://github.com/adityapk00/lightwalletd-z-cash).
 
 **What's missing?**
 
