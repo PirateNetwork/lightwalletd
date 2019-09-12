@@ -87,7 +87,26 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 }
 
 func (s *SqlStreamer) GetUtxos(address *walletrpc.TransparentAddress, resp walletrpc.CompactTxStreamer_GetUtxosServer) error {
-	s.client.GetAddressUtxos("someaddress")
+	utxos, _ := s.client.GetAddressUtxos(address.Address)
+
+	for _, utxo := range utxos {
+		txid, _ := hex.DecodeString(utxo.TxID)
+		script, _ := hex.DecodeString(utxo.ScriptPubKey)
+
+		respUtxo := &walletrpc.Utxo{
+			Address:     address,
+			Txid:        txid,
+			OutputIndex: uint64(utxo.OutputIndex),
+			Script:      script,
+			Value:       utxo.Amount,
+			Height:      uint64(utxo.Height),
+		}
+
+		err := resp.Send(respUtxo)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
