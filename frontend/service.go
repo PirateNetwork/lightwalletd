@@ -13,6 +13,7 @@ import (
 
 	"github.com/adityapk00/btcd/rpcclient"
 	"github.com/golang/protobuf/proto"
+	"github.com/sirupsen/logrus"
 
 	// blank import for sqlite driver support
 	_ "github.com/mattn/go-sqlite3"
@@ -29,9 +30,10 @@ var (
 type SqlStreamer struct {
 	db     *sql.DB
 	client *rpcclient.Client
+	log    *logrus.Entry
 }
 
-func NewSQLiteStreamer(dbPath string, client *rpcclient.Client) (walletrpc.CompactTxStreamerServer, error) {
+func NewSQLiteStreamer(dbPath string, client *rpcclient.Client, log *logrus.Entry) (walletrpc.CompactTxStreamerServer, error) {
 	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?_busy_timeout=10000&cache=shared", dbPath))
 	db.SetMaxOpenConns(1)
 	if err != nil {
@@ -44,7 +46,7 @@ func NewSQLiteStreamer(dbPath string, client *rpcclient.Client) (walletrpc.Compa
 		return nil, err
 	}
 
-	return &SqlStreamer{db, client}, nil
+	return &SqlStreamer{db, client, log}, nil
 }
 
 func (s *SqlStreamer) GracefulStop() error {
@@ -84,6 +86,61 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 	cBlock := &walletrpc.CompactBlock{}
 	err = proto.Unmarshal(blockBytes, cBlock)
 	return cBlock, err
+}
+
+func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetAddressTxidsServer) error {
+	params := make([]json.RawMessage, 1)
+	st := "{\"addresses\": [\"" + addressBlockFilter.Address + "\"]," +
+		"\"start\": " + strconv.FormatUint(addressBlockFilter.Range.Start.Height, 10) +
+		", \"end\": " + strconv.FormatUint(addressBlockFilter.Range.End.Height, 10) + "}"
+
+	params[0] = json.RawMessage(st)
+
+	result, rpcErr := s.client.RawRequest("getaddresstxids", params)
+
+	var err error
+	var errCode int64
+
+	// For some reason, the error responses are not JSON
+	if rpcErr != nil {
+		s.log.Errorf("Got error: %s", rpcErr.Error())
+		errParts := strings.SplitN(rpcErr.Error(), ":", 2)
+		errCode, err = strconv.ParseInt(errParts[0], 10, 32)
+		//Check to see if we are requesting a height the zcashd doesn't have yet
+		if err == nil && errCode == -8 {
+			return nil
+		}
+		return nil
+	}
+
+	var txids []string
+	err = json.Unmarshal(result, &txids)
+	if err != nil {
+		s.log.Errorf("Got error: %s", err.Error())
+		return nil
+	}
+
+	timeout, cancel := context.WithTimeout(resp.Context(), 30*time.Second)
+	defer cancel()
+
+	for _, txidstr := range txids {
+		txid, _ := hex.DecodeString(txidstr)
+		// Txid is read as a string, which is in big-endian order. But when converting
+		// to bytes, it should be little-endian
+		for left, right := 0, len(txid)-1; left < right; left, right = left+1, right-1 {
+			txid[left], txid[right] = txid[right], txid[left]
+		}
+
+		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: txid})
+		if err != nil {
+			s.log.Errorf("Got error: %s", err.Error())
+			return nil
+		}
+
+		resp.Send(tx)
+	}
+
+	return nil
 }
 
 func (s *SqlStreamer) GetUtxos(address *walletrpc.TransparentAddress, resp walletrpc.CompactTxStreamer_GetUtxosServer) error {
