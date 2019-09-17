@@ -212,33 +212,34 @@ func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 
 func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
 	var txBytes []byte
+	var txHeight int
 	var err error
 
 	if txf.Hash != nil {
 		leHashString := hex.EncodeToString(txf.Hash)
-		txBytes, err = storage.GetTxByHash(ctx, s.db, leHashString)
+		txBytes, txHeight, err = storage.GetTxByHash(ctx, s.db, leHashString)
 		if err != nil {
 			return nil, err
 		}
-		return &walletrpc.RawTransaction{Data: txBytes}, nil
+		return &walletrpc.RawTransaction{Data: txBytes, Height: uint64(txHeight)}, nil
 
 	}
 
 	if txf.Block.Hash != nil {
 		leHashString := hex.EncodeToString(txf.Hash)
-		txBytes, err = storage.GetTxByHashAndIndex(ctx, s.db, leHashString, int(txf.Index))
+		txBytes, txHeight, err = storage.GetTxByHashAndIndex(ctx, s.db, leHashString, int(txf.Index))
 		if err != nil {
 			return nil, err
 		}
-		return &walletrpc.RawTransaction{Data: txBytes}, nil
+		return &walletrpc.RawTransaction{Data: txBytes, Height: uint64(txHeight)}, nil
 	}
 
 	// A totally unset protobuf will attempt to fetch the genesis coinbase tx.
-	txBytes, err = storage.GetTxByHeightAndIndex(ctx, s.db, int(txf.Block.Height), int(txf.Index))
+	txBytes, txHeight, err = storage.GetTxByHeightAndIndex(ctx, s.db, int(txf.Block.Height), int(txf.Index))
 	if err != nil {
 		return nil, err
 	}
-	return &walletrpc.RawTransaction{Data: txBytes}, nil
+	return &walletrpc.RawTransaction{Data: txBytes, Height: uint64(txHeight)}, nil
 }
 
 // GetLightdInfo gets the LightWalletD (this server) info
