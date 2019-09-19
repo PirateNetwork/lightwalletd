@@ -18,6 +18,7 @@ import (
 	// blank import for sqlite driver support
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/adityapk00/lightwalletd/common"
 	"github.com/adityapk00/lightwalletd/storage"
 	"github.com/adityapk00/lightwalletd/walletrpc"
 )
@@ -244,12 +245,16 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 
 // GetLightdInfo gets the LightWalletD (this server) info
 func (s *SqlStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
+	saplingHeight, chainName, _ := common.GetSaplingInfo(s.client)
+
 	// TODO these are called Error but they aren't at the moment.
 	// A success will return code 0 and message txhash.
 	return &walletrpc.LightdInfo{
-		Version:      "0.1-zeclightd",
-		Vendor:       "ZecWallet LightWalletD",
-		TaddrSupport: true,
+		Version:                 "0.1-zeclightd",
+		Vendor:                  "ZecWallet LightWalletD",
+		TaddrSupport:            true,
+		ChainName:               chainName,
+		SaplingActivationHeight: uint64(saplingHeight),
 	}, nil
 }
 

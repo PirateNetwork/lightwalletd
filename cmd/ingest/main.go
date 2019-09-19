@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/adityapk00/lightwalletd/common"
 	"github.com/adityapk00/lightwalletd/frontend"
 	"github.com/adityapk00/lightwalletd/parser"
 	"github.com/adityapk00/lightwalletd/storage"
@@ -120,14 +121,14 @@ func main() {
 	}
 
 	// Get the sapling activation height from the RPC
-	saplingHeight, err := getSaplingActivationHeight(rpcClient)
+	saplingHeight, chainName, err := common.GetSaplingInfo(rpcClient)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err,
 		}).Warn("Unable to get sapling activation height")
 	}
 
-	log.WithField("saplingHeight", saplingHeight).Info("Got sapling height ", saplingHeight)
+	log.WithField("saplingHeight", saplingHeight).Info("Got sapling height ", saplingHeight, " chain ", chainName)
 
 	//ingest from Sapling testnet height
 	if height < saplingHeight {
@@ -190,36 +191,6 @@ func main() {
 			time.Sleep(60 * time.Second)
 		}
 	}
-}
-
-func getSaplingActivationHeight(rpcClient *rpcclient.Client) (int, error) {
-	result, rpcErr := rpcClient.RawRequest("getblockchaininfo", make([]json.RawMessage, 0))
-
-	var err error
-	var errCode int64
-
-	// For some reason, the error responses are not JSON
-	if rpcErr != nil {
-		errParts := strings.SplitN(rpcErr.Error(), ":", 2)
-		errCode, err = strconv.ParseInt(errParts[0], 10, 32)
-		//Check to see if we are requesting a height the zcashd doesn't have yet
-		if err == nil && errCode == -8 {
-			return -1, nil
-		}
-		return -1, errors.Wrap(rpcErr, "error requesting block")
-	}
-
-	var f interface{}
-	err = json.Unmarshal(result, &f)
-	if err != nil {
-		return -1, errors.Wrap(err, "error reading JSON response")
-	}
-
-	upgradeJSON := f.(map[string]interface{})["upgrades"]
-	saplingJSON := upgradeJSON.(map[string]interface{})["76b809bb"] // Sapling ID
-	saplingHeight := saplingJSON.(map[string]interface{})["activationheight"].(float64)
-
-	return int(saplingHeight), nil
 }
 
 func getBlock(rpcClient *rpcclient.Client, height int) (*parser.Block, error) {
