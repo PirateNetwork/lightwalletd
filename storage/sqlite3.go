@@ -58,7 +58,7 @@ func CreateTables(conn *sql.DB) error {
 // TODO consider max/count queries instead of state table. bit of a coupling assumption though.
 
 func GetCurrentHeight(ctx context.Context, db *sql.DB) (int, error) {
-	var height int
+	var height int = -1
 	query := "SELECT current_height FROM state WHERE rowid = 1"
 	err := db.QueryRowContext(ctx, query).Scan(&height)
 	return height, err

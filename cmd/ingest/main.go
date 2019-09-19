@@ -8,13 +8,13 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/pkg/errors"
 	"github.com/adityapk00/btcd/rpcclient"
 	"github.com/golang/protobuf/proto"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/adityapk00/lightwalletd/frontend"
@@ -26,10 +26,11 @@ var log *logrus.Entry
 var logger = logrus.New()
 var db *sql.DB
 
+// Options is a struct holding command line options
 type Options struct {
-	dbPath   string
-	logLevel uint64
-	logPath  string
+	dbPath        string
+	logLevel      uint64
+	logPath       string
 	zcashConfPath string
 }
 
@@ -115,71 +116,110 @@ func main() {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err,
-  	}).Warn("unable to get current height from local db storage")
-		
+		}).Warn("Unable to get current height from local db storage. This is OK if you're starting this for the first time.")
 	}
-	
-	//ingest from Sapling testnet height
-	if height < 280000 {
-		height = 280000
+
+	// Get the sapling activation height from the RPC
+	saplingHeight, err := getSaplingActivationHeight(rpcClient)
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err,
-  	}).Warn("invalid current height read from local db storage")
+		}).Warn("Unable to get sapling activation height")
 	}
-	
-	timeout_count := 0
-	reorg_count := -1
+
+	log.WithField("saplingHeight", saplingHeight).Info("Got sapling height ", saplingHeight)
+
+	//ingest from Sapling testnet height
+	if height < saplingHeight {
+		height = saplingHeight
+		log.WithFields(logrus.Fields{
+			"error": err,
+		}).Warn("invalid current height read from local db storage")
+	}
+
+	timeoutCount := 0
+	reorgCount := -1
 	hash := ""
 	phash := ""
 	// Start listening for new blocks
 	for {
-		if reorg_count > 0 {
-			reorg_count = -1
+		if reorgCount > 0 {
+			reorgCount = -1
 			height -= 10
 		}
 		block, err := getBlock(rpcClient, height)
-		
+
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"height": height,
 				"error":  err,
 			}).Warn("error with getblock")
-			timeout_count++
-			if timeout_count == 3 {
+			timeoutCount++
+			if timeoutCount == 3 {
 				log.WithFields(logrus.Fields{
-					"timeouts":  timeout_count,
+					"timeouts": timeoutCount,
 				}).Warn("unable to issue RPC call to zcashd node 3 times")
 				break
 			}
 		}
 		if block != nil {
 			handleBlock(db, block)
-			if timeout_count > 0 {
-				timeout_count--
+			if timeoutCount > 0 {
+				timeoutCount--
 			}
 			phash = hex.EncodeToString(block.GetPrevHash())
 			//check for reorgs once we have inital block hash from startup
-			if hash != phash && reorg_count != -1 {
-				reorg_count++
+			if hash != phash && reorgCount != -1 {
+				reorgCount++
 				log.WithFields(logrus.Fields{
 					"height": height,
-					"hash":  hash,
-					"phash": phash,
-					"reorg": reorg_count,
+					"hash":   hash,
+					"phash":  phash,
+					"reorg":  reorgCount,
 				}).Warn("REORG")
 			} else {
-			  hash = hex.EncodeToString(block.GetDisplayHash())
-			}
-			if reorg_count == -1 {
 				hash = hex.EncodeToString(block.GetDisplayHash())
-				reorg_count =0
-			}	
+			}
+			if reorgCount == -1 {
+				hash = hex.EncodeToString(block.GetDisplayHash())
+				reorgCount = 0
+			}
 			height++
 		} else {
 			//TODO implement blocknotify to minimize polling on corner cases
 			time.Sleep(60 * time.Second)
 		}
 	}
+}
+
+func getSaplingActivationHeight(rpcClient *rpcclient.Client) (int, error) {
+	result, rpcErr := rpcClient.RawRequest("getblockchaininfo", make([]json.RawMessage, 0))
+
+	var err error
+	var errCode int64
+
+	// For some reason, the error responses are not JSON
+	if rpcErr != nil {
+		errParts := strings.SplitN(rpcErr.Error(), ":", 2)
+		errCode, err = strconv.ParseInt(errParts[0], 10, 32)
+		//Check to see if we are requesting a height the zcashd doesn't have yet
+		if err == nil && errCode == -8 {
+			return -1, nil
+		}
+		return -1, errors.Wrap(rpcErr, "error requesting block")
+	}
+
+	var f interface{}
+	err = json.Unmarshal(result, &f)
+	if err != nil {
+		return -1, errors.Wrap(err, "error reading JSON response")
+	}
+
+	upgradeJSON := f.(map[string]interface{})["upgrades"]
+	saplingJSON := upgradeJSON.(map[string]interface{})["76b809bb"] // Sapling ID
+	saplingHeight := saplingJSON.(map[string]interface{})["activationheight"].(float64)
+
+	return int(saplingHeight), nil
 }
 
 func getBlock(rpcClient *rpcclient.Client, height int) (*parser.Block, error) {
@@ -204,7 +244,7 @@ func getBlock(rpcClient *rpcclient.Client, height int) (*parser.Block, error) {
 
 	var blockDataHex string
 	err = json.Unmarshal(result, &blockDataHex)
-	if err != nil{
+	if err != nil {
 		return nil, errors.Wrap(err, "error reading JSON response")
 	}
 
@@ -224,12 +264,11 @@ func getBlock(rpcClient *rpcclient.Client, height int) (*parser.Block, error) {
 	return block, nil
 }
 
-
 func handleBlock(db *sql.DB, block *parser.Block) {
 	prevBlockHash := hex.EncodeToString(block.GetPrevHash())
 	blockHash := hex.EncodeToString(block.GetEncodableHash())
 	marshaledBlock, _ := proto.Marshal(block.ToCompact())
-	
+
 	err := storage.StoreBlock(
 		db,
 		block.GetHeight(),
