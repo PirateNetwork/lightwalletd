@@ -245,7 +245,10 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 
 // GetLightdInfo gets the LightWalletD (this server) info
 func (s *SqlStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
-	saplingHeight, chainName, _ := common.GetSaplingInfo(s.client)
+	saplingHeight, chainName, err := common.GetSaplingInfo(s.client)
+	if err != nil {
+		return nil, err
+	}
 
 	// TODO these are called Error but they aren't at the moment.
 	// A success will return code 0 and message txhash.
