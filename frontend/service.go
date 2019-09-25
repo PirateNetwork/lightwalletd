@@ -2,24 +2,17 @@ package frontend
 
 import (
 	"context"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/rpcclient"
-	"github.com/golang/protobuf/proto"
 	"github.com/sirupsen/logrus"
 
-	// blank import for sqlite driver support
-	_ "github.com/mattn/go-sqlite3"
-
 	"github.com/adityapk00/lightwalletd/common"
-	"github.com/adityapk00/lightwalletd/storage"
 	"github.com/adityapk00/lightwalletd/walletrpc"
 )
 
@@ -29,64 +22,45 @@ var (
 
 // the service type
 type SqlStreamer struct {
-	db     *sql.DB
 	client *rpcclient.Client
 	log    *logrus.Entry
 }
 
-func NewSQLiteStreamer(dbPath string, client *rpcclient.Client, log *logrus.Entry) (walletrpc.CompactTxStreamerServer, error) {
-	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?_busy_timeout=10000&cache=shared", dbPath))
-	db.SetMaxOpenConns(1)
-	if err != nil {
-		return nil, err
-	}
-
-	// Creates our tables if they don't already exist.
-	err = storage.CreateTables(db)
-	if err != nil {
-		return nil, err
-	}
-
-	return &SqlStreamer{db, client, log}, nil
+func NewSQLiteStreamer(client *rpcclient.Client, log *logrus.Entry) (walletrpc.CompactTxStreamerServer, error) {
+	return &SqlStreamer{client, log}, nil
 }
 
 func (s *SqlStreamer) GracefulStop() error {
-	return s.db.Close()
+	return nil
 }
 
 func (s *SqlStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
-	// the ChainSpec type is an empty placeholder
-	height, err := storage.GetCurrentHeight(ctx, s.db)
-	if err != nil {
-		return nil, err
-	}
-	// TODO: also return block hashes here
-	return &walletrpc.BlockID{Height: uint64(height)}, nil
-}
+	result, rpcErr := s.client.RawRequest("getinfo", make([]json.RawMessage, 0))
 
-func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
-	if id.Height == 0 && id.Hash == nil {
-		return nil, ErrUnspecified
-	}
-
-	var blockBytes []byte
 	var err error
+	var errCode int64
 
-	// Precedence: a hash is more specific than a height. If we have it, use it first.
-	if id.Hash != nil {
-		leHashString := hex.EncodeToString(id.Hash)
-		blockBytes, err = storage.GetBlockByHash(ctx, s.db, leHashString)
-	} else {
-		blockBytes, err = storage.GetBlock(ctx, s.db, int(id.Height))
+	// For some reason, the error responses are not JSON
+	if rpcErr != nil {
+		errParts := strings.SplitN(rpcErr.Error(), ":", 2)
+		errCode, err = strconv.ParseInt(errParts[0], 10, 32)
+		//Check to see if we are requesting a height the zcashd doesn't have yet
+		if err == nil && errCode == -8 {
+			return nil, errors.New("Don't have the requested block")
+		}
+		return nil, err
 	}
 
+	var f interface{}
+	err = json.Unmarshal(result, &f)
 	if err != nil {
 		return nil, err
 	}
 
-	cBlock := &walletrpc.CompactBlock{}
-	err = proto.Unmarshal(blockBytes, cBlock)
-	return cBlock, err
+	latestBlock := f.(map[string]interface{})["blocks"].(float64)
+
+	// TODO: also return block hashes here
+	return &walletrpc.BlockID{Height: uint64(latestBlock)}, nil
 }
 
 func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetAddressTxidsServer) error {
@@ -144,33 +118,41 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 	return nil
 }
 
+func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
+	if id.Height == 0 && id.Hash == nil {
+		return nil, ErrUnspecified
+	}
+
+	// Precedence: a hash is more specific than a height. If we have it, use it first.
+	if id.Hash != nil {
+		// TODO: Get block by hash
+
+		return nil, errors.New("GetBlock by Hash is not yet implemented")
+	} else {
+		cBlock, err := common.GetBlock(s.client, int(id.Height))
+
+		if err != nil {
+			return nil, err
+		}
+
+		return cBlock.ToCompact(), err
+	}
+
+}
+
 func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
-	blockChan := make(chan []byte)
+	blockChan := make(chan walletrpc.CompactBlock)
 	errChan := make(chan error)
 
-	// TODO configure or stress-test this timeout
-	timeout, cancel := context.WithTimeout(resp.Context(), 30*time.Second)
-	defer cancel()
-	go storage.GetBlockRange(timeout,
-		s.db,
-		blockChan,
-		errChan,
-		int(span.Start.Height),
-		int(span.End.Height),
-	)
+	go common.GetBlockRange(s.client, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
 
 	for {
 		select {
 		case err := <-errChan:
 			// this will also catch context.DeadlineExceeded from the timeout
 			return err
-		case blockBytes := <-blockChan:
-			cBlock := &walletrpc.CompactBlock{}
-			err := proto.Unmarshal(blockBytes, cBlock)
-			if err != nil {
-				return err // TODO really need better logging in this whole service
-			}
-			err = resp.Send(cBlock)
+		case cBlock := <-blockChan:
+			err := resp.Send(&cBlock)
 			if err != nil {
 				return err
 			}

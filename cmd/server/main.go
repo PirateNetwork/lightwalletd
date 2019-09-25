@@ -171,7 +171,7 @@ func main() {
 	log.WithField("saplingHeight", saplingHeight).Info("Got sapling height ", saplingHeight, " chain ", chainName)
 
 	// Compact transaction service initialization
-	service, err := frontend.NewSQLiteStreamer(opts.dbPath, rpcClient, log)
+	service, err := frontend.NewSQLiteStreamer(rpcClient, log)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"db_path": opts.dbPath,
