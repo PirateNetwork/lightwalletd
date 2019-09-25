@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adityapk00/btcd/rpcclient"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

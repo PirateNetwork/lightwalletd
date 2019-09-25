@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adityapk00/btcd/rpcclient"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/golang/protobuf/proto"
 	"github.com/sirupsen/logrus"
 
@@ -139,37 +139,6 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 		}
 
 		resp.Send(tx)
-	}
-
-	return nil
-}
-
-func (s *SqlStreamer) GetUtxos(address *walletrpc.TransparentAddress, resp walletrpc.CompactTxStreamer_GetUtxosServer) error {
-	utxos, _ := s.client.GetAddressUtxos(address.Address)
-
-	for _, utxo := range utxos {
-		txid, _ := hex.DecodeString(utxo.TxID)
-		// Txid is read as a string, which is in big-endian order. But when converting
-		// to bytes, it should be little-endian
-		for left, right := 0, len(txid)-1; left < right; left, right = left+1, right-1 {
-			txid[left], txid[right] = txid[right], txid[left]
-		}
-
-		script, _ := hex.DecodeString(utxo.ScriptPubKey)
-
-		respUtxo := &walletrpc.Utxo{
-			Address:     address,
-			Txid:        txid,
-			OutputIndex: uint64(utxo.OutputIndex),
-			Script:      script,
-			Value:       utxo.Amount,
-			Height:      uint64(utxo.Height),
-		}
-
-		err := resp.Send(respUtxo)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/adityapk00/btcd/rpcclient"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/pkg/errors"
 )
 

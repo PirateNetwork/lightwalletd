@@ -3,7 +3,7 @@ package frontend
 import (
 	"net"
 
-	"github.com/adityapk00/btcd/rpcclient"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/pkg/errors"
 	ini "gopkg.in/ini.v1"
 )
