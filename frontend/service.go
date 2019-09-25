@@ -182,33 +182,79 @@ func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 
 func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
 	var txBytes []byte
-	var txHeight int
-	var err error
+	var txHeight float64
 
 	if txf.Hash != nil {
-		leHashString := hex.EncodeToString(txf.Hash)
-		txBytes, txHeight, err = storage.GetTxByHash(ctx, s.db, leHashString)
+		txid := txf.Hash
+		for left, right := 0, len(txid)-1; left < right; left, right = left+1, right-1 {
+			txid[left], txid[right] = txid[right], txid[left]
+		}
+		leHashString := hex.EncodeToString(txid)
+
+		// First call to get the raw transaction bytes
+		params := make([]json.RawMessage, 1)
+		params[0] = json.RawMessage("\"" + leHashString + "\"")
+
+		result, rpcErr := s.client.RawRequest("getrawtransaction", params)
+
+		var err error
+		var errCode int64
+		// For some reason, the error responses are not JSON
+		if rpcErr != nil {
+			s.log.Errorf("Got error: %s", rpcErr.Error())
+			errParts := strings.SplitN(rpcErr.Error(), ":", 2)
+			errCode, err = strconv.ParseInt(errParts[0], 10, 32)
+			//Check to see if we are requesting a height the zcashd doesn't have yet
+			if err == nil && errCode == -8 {
+				return nil, err
+			}
+			return nil, err
+		}
+
+		var txhex string
+		err = json.Unmarshal(result, &txhex)
 		if err != nil {
 			return nil, err
 		}
-		return &walletrpc.RawTransaction{Data: txBytes, Height: uint64(txHeight)}, nil
 
+		txBytes, err = hex.DecodeString(txhex)
+		if err != nil {
+			return nil, err
+		}
+
+		// Second call to get height
+		params = make([]json.RawMessage, 2)
+		params[0] = json.RawMessage("\"" + leHashString + "\"")
+		params[1] = json.RawMessage("1")
+
+		result, rpcErr = s.client.RawRequest("getrawtransaction", params)
+
+		// For some reason, the error responses are not JSON
+		if rpcErr != nil {
+			s.log.Errorf("Got error: %s", rpcErr.Error())
+			errParts := strings.SplitN(rpcErr.Error(), ":", 2)
+			errCode, err = strconv.ParseInt(errParts[0], 10, 32)
+			//Check to see if we are requesting a height the zcashd doesn't have yet
+			if err == nil && errCode == -8 {
+				return nil, err
+			}
+			return nil, err
+		}
+		var txinfo interface{}
+		err = json.Unmarshal(result, &txinfo)
+		if err != nil {
+			return nil, err
+		}
+		txHeight = txinfo.(map[string]interface{})["height"].(float64)
+
+		return &walletrpc.RawTransaction{Data: txBytes, Height: uint64(txHeight)}, nil
 	}
 
 	if txf.Block.Hash != nil {
-		leHashString := hex.EncodeToString(txf.Hash)
-		txBytes, txHeight, err = storage.GetTxByHashAndIndex(ctx, s.db, leHashString, int(txf.Index))
-		if err != nil {
-			return nil, err
-		}
-		return &walletrpc.RawTransaction{Data: txBytes, Height: uint64(txHeight)}, nil
+		s.log.Error("Can't GetTransaction with a blockhash+num. Please call GetTransaction with txid")
+		return nil, errors.New("Can't GetTransaction with a blockhash+num. Please call GetTransaction with txid")
 	}
 
-	// A totally unset protobuf will attempt to fetch the genesis coinbase tx.
-	txBytes, txHeight, err = storage.GetTxByHeightAndIndex(ctx, s.db, int(txf.Block.Height), int(txf.Index))
-	if err != nil {
-		return nil, err
-	}
 	return &walletrpc.RawTransaction{Data: txBytes, Height: uint64(txHeight)}, nil
 }
 
