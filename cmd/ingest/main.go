@@ -265,28 +265,4 @@ func handleBlock(db *sql.DB, block *parser.Block) {
 		entry.Info("new block")
 	}
 
-	for index, tx := range block.Transactions() {
-		txHash := hex.EncodeToString(tx.GetEncodableHash())
-		err = storage.StoreTransaction(
-			db,
-			block.GetHeight(),
-			blockHash,
-			index,
-			txHash,
-			tx.Bytes(),
-		)
-		entry = log.WithFields(logrus.Fields{
-			"block_height": block.GetHeight(),
-			"block_hash":   hex.EncodeToString(block.GetDisplayHash()),
-			"tx_index":     index,
-			"tx_size":      len(tx.Bytes()),
-			"sapling":      tx.HasSaplingTransactions(),
-			"error":        err,
-		})
-		if err != nil {
-			entry.Error("storing tx")
-		} else {
-			entry.Debug("storing tx")
-		}
-	}
 }

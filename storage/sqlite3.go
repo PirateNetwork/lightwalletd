@@ -35,22 +35,6 @@ func CreateTables(conn *sql.DB) error {
 		);
 	`
 	_, err = conn.Exec(blockTable)
-	if err != nil {
-		return err
-	}
-
-	txTable := `
-		CREATE TABLE IF NOT EXISTS transactions (
-			block_height INTEGER,
-			block_hash TEXT,
-			tx_index INTEGER,
-			tx_hash TEXT,
-			tx_bytes BLOB,
-			FOREIGN KEY (block_height) REFERENCES blocks (block_height),
-			FOREIGN KEY (block_hash) REFERENCES blocks (block_hash)
-		);
-	`
-	_, err = conn.Exec(txTable)
 
 	return err
 }
@@ -177,52 +161,4 @@ func setCurrentHeight(tx *sql.Tx, height int) error {
 		}
 	}
 	return nil
-}
-
-func StoreTransaction(db *sql.DB, blockHeight int, blockHash string, txIndex int, txHash string, txBytes []byte) error {
-	insertTx := "INSERT INTO transactions (block_height, block_hash, tx_index, tx_hash, tx_bytes) VALUES (?,?,?,?,?)"
-	_, err := db.Exec(insertTx, blockHeight, blockHash, txIndex, txHash, txBytes)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("storing tx %x", txHash))
-	}
-	return nil
-}
-
-// GetTxByHash retrieves a full transaction by its little-endian hash.
-func GetTxByHash(ctx context.Context, db *sql.DB, txHash string) ([]byte, int, error) {
-	var txBytes []byte // avoid a copy with *RawBytes
-	var height int
-
-	query := "SELECT tx_bytes, block_height from transactions WHERE tx_hash = ?"
-	err := db.QueryRowContext(ctx, query, txHash).Scan(&txBytes, &height)
-	if err != nil {
-		return nil, 0, errors.Wrap(err, fmt.Sprintf("getting tx with hash %s", txHash))
-	}
-	return txBytes, height, nil
-}
-
-// GetTxByHeightAndIndex retrieves a full transaction by its parent block height and index
-func GetTxByHeightAndIndex(ctx context.Context, db *sql.DB, blockHeight, txIndex int) ([]byte, int, error) {
-	var txBytes []byte // avoid a copy with *RawBytes
-	var height int
-
-	query := "SELECT tx_bytes, block_height from transactions WHERE (block_height = ? AND tx_index = ?)"
-	err := db.QueryRowContext(ctx, query, blockHeight, txIndex).Scan(&txBytes, &height)
-	if err != nil {
-		return nil, 0, errors.Wrap(err, fmt.Sprintf("getting tx (%d, %d)", blockHeight, txIndex))
-	}
-	return txBytes, height, nil
-}
-
-// GetTxByHashAndIndex retrieves a full transaction by its parent block hash and index
-func GetTxByHashAndIndex(ctx context.Context, db *sql.DB, blockHash string, txIndex int) ([]byte, int, error) {
-	var txBytes []byte // avoid a copy with *RawBytes
-	var height int
-
-	query := "SELECT tx_bytes, block_height from transactions WHERE (block_hash = ? AND tx_index = ?)"
-	err := db.QueryRowContext(ctx, query, blockHash, txIndex).Scan(&txBytes, &height)
-	if err != nil {
-		return nil, 0, errors.Wrap(err, fmt.Sprintf("getting tx (%x, %d)", blockHash, txIndex))
-	}
-	return txBytes, height, nil
 }
