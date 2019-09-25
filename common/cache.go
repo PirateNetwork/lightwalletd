@@ -1,6 +1,11 @@
 package common
 
-import "github.com/pkg/errors"
+import (
+	"bytes"
+
+	"github.com/adityapk00/lightwalletd/parser"
+	"github.com/pkg/errors"
+)
 
 type BlockCache struct {
 	MaxEntries int
@@ -8,7 +13,7 @@ type BlockCache struct {
 	FirstBlock int
 	LastBlock  int
 
-	m map[int][]byte
+	m map[int]*parser.Block
 }
 
 func New(maxEntries int) *BlockCache {
@@ -16,12 +21,12 @@ func New(maxEntries int) *BlockCache {
 		MaxEntries: maxEntries,
 		FirstBlock: -1,
 		LastBlock:  -1,
-		m:          make(map[int][]byte),
+		m:          make(map[int]*parser.Block),
 	}
 }
 
-func (c *BlockCache) Add(height int, bytes []byte) error {
-
+func (c *BlockCache) Add(height int, block *parser.Block) error {
+	println("Cache add", height)
 	if c.FirstBlock == -1 && c.LastBlock == -1 {
 		// If this is the first block, prep the data structure
 		c.FirstBlock = height
@@ -32,14 +37,20 @@ func (c *BlockCache) Add(height int, bytes []byte) error {
 		for i := height; i <= c.LastBlock; i++ {
 			delete(c.m, i)
 		}
+		c.LastBlock = height - 1
 	}
 
 	if height != c.LastBlock+1 {
 		return errors.New("Blocks need to be added sequentially")
 	}
 
+	if c.m[height-1] != nil && !bytes.Equal(block.GetPrevHash(), c.m[height-1].GetEncodableHash()) {
+		return errors.New("Prev hash of the block didn't match")
+	}
+
 	// Add the entry and update the counters
-	c.m[height] = bytes
+	c.m[height] = block
+
 	c.LastBlock = height
 
 	// If the cache is full, remove the oldest block
@@ -51,15 +62,16 @@ func (c *BlockCache) Add(height int, bytes []byte) error {
 	return nil
 }
 
-func (c *BlockCache) Get(height int) ([]byte, error) {
-
+func (c *BlockCache) Get(height int) *parser.Block {
+	println("Cache get", height)
 	if c.LastBlock == -1 || c.FirstBlock == -1 {
-		return nil, errors.New("Map is empty")
+		return nil
 	}
 
 	if height < c.FirstBlock || height > c.LastBlock {
-		return nil, errors.New("Index out of range")
+		return nil
 	}
 
-	return c.m[height], nil
+	println("Cache returned")
+	return c.m[height]
 }

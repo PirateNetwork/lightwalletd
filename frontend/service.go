@@ -22,12 +22,13 @@ var (
 
 // the service type
 type SqlStreamer struct {
+	cache  *common.BlockCache
 	client *rpcclient.Client
 	log    *logrus.Entry
 }
 
 func NewSQLiteStreamer(client *rpcclient.Client, log *logrus.Entry) (walletrpc.CompactTxStreamerServer, error) {
-	return &SqlStreamer{client, log}, nil
+	return &SqlStreamer{common.New(100000), client, log}, nil
 }
 
 func (s *SqlStreamer) GracefulStop() error {
@@ -129,7 +130,7 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 
 		return nil, errors.New("GetBlock by Hash is not yet implemented")
 	} else {
-		cBlock, err := common.GetBlock(s.client, int(id.Height))
+		cBlock, err := common.GetBlock(s.client, s.cache, int(id.Height))
 
 		if err != nil {
 			return nil, err
@@ -144,7 +145,7 @@ func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 	blockChan := make(chan walletrpc.CompactBlock)
 	errChan := make(chan error)
 
-	go common.GetBlockRange(s.client, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
+	go common.GetBlockRange(s.client, s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
 
 	for {
 		select {
