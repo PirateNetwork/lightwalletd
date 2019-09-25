@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/adityapk00/lightwalletd/common"
 	"github.com/adityapk00/lightwalletd/frontend"
 	"github.com/adityapk00/lightwalletd/walletrpc"
 )
@@ -158,6 +159,16 @@ func main() {
 			}).Warn("couldn't start rpc conn. won't be able to send transactions")
 		}
 	}
+
+	// Get the sapling activation height from the RPC
+	saplingHeight, chainName, err := common.GetSaplingInfo(rpcClient)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"error": err,
+		}).Warn("Unable to get sapling activation height")
+	}
+
+	log.WithField("saplingHeight", saplingHeight).Info("Got sapling height ", saplingHeight, " chain ", chainName)
 
 	// Compact transaction service initialization
 	service, err := frontend.NewSQLiteStreamer(opts.dbPath, rpcClient, log)

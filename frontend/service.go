@@ -220,6 +220,7 @@ func (s *SqlStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*
 		s.log.WithFields(logrus.Fields{
 			"error": err,
 		}).Warn("Unable to get sapling activation height")
+		return nil, err
 	}
 
 	// TODO these are called Error but they aren't at the moment.
