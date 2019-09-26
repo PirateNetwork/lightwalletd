@@ -136,7 +136,7 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 			return nil, err
 		}
 
-		return cBlock.ToCompact(), err
+		return cBlock, err
 	}
 
 }

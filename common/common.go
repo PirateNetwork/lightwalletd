@@ -45,7 +45,7 @@ func GetSaplingInfo(rpcClient *rpcclient.Client) (int, string, error) {
 	return int(saplingHeight), chainName, nil
 }
 
-func getBlockFromRPC(rpcClient *rpcclient.Client, height int) (*parser.Block, error) {
+func getBlockFromRPC(rpcClient *rpcclient.Client, height int) (*walletrpc.CompactBlock, error) {
 	params := make([]json.RawMessage, 2)
 	params[0] = json.RawMessage("\"" + strconv.Itoa(height) + "\"")
 	params[1] = json.RawMessage("0")
@@ -85,10 +85,10 @@ func getBlockFromRPC(rpcClient *rpcclient.Client, height int) (*parser.Block, er
 		return nil, errors.New("received overlong message")
 	}
 
-	return block, nil
+	return block.ToCompact(), nil
 }
 
-func GetBlock(rpcClient *rpcclient.Client, cache *BlockCache, height int) (*parser.Block, error) {
+func GetBlock(rpcClient *rpcclient.Client, cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
 	// First, check the cache to see if we have the block
 	block := cache.Get(height)
 	if block != nil {
@@ -104,16 +104,16 @@ func GetBlock(rpcClient *rpcclient.Client, cache *BlockCache, height int) (*pars
 	prevBlock := cache.Get(height - 1)
 
 	if prevBlock != nil {
-		if !bytes.Equal(prevBlock.GetEncodableHash(), block.GetPrevHash()) {
+		if !bytes.Equal(prevBlock.Hash, block.PrevHash) {
 			// Reorg!
 			reorgCount := 0
 			cacheBlock := cache.Get(height - reorgCount)
 
-			rpcBlocks := []*parser.Block{}
+			rpcBlocks := []*walletrpc.CompactBlock{}
 
 			for ; reorgCount <= 100 &&
 				cacheBlock != nil &&
-				!bytes.Equal(block.GetPrevHash(), cacheBlock.GetEncodableHash()); reorgCount++ {
+				!bytes.Equal(block.PrevHash, cacheBlock.Hash); reorgCount++ {
 
 				block, err = getBlockFromRPC(rpcClient, height-reorgCount-1)
 				if err != nil {
@@ -133,7 +133,7 @@ func GetBlock(rpcClient *rpcclient.Client, cache *BlockCache, height int) (*pars
 			// At this point, the block.prevHash == cache.hash
 			// Store all blocks starting with 'block'
 			for i := len(rpcBlocks) - 1; i >= 0; i-- {
-				cache.Add(rpcBlocks[i].GetHeight(), rpcBlocks[i])
+				cache.Add(int(rpcBlocks[i].Height), rpcBlocks[i])
 			}
 		}
 	}
@@ -146,8 +146,6 @@ func GetBlock(rpcClient *rpcclient.Client, cache *BlockCache, height int) (*pars
 func GetBlockRange(rpcClient *rpcclient.Client, cache *BlockCache,
 	blockOut chan<- walletrpc.CompactBlock, errOut chan<- error, start, end int) {
 
-	println("Getting block range")
-
 	// Go over [start, end] inclusive
 	for i := start; i <= end; i++ {
 		block, err := GetBlock(rpcClient, cache, i)
@@ -156,7 +154,7 @@ func GetBlockRange(rpcClient *rpcclient.Client, cache *BlockCache,
 			return
 		}
 
-		blockOut <- *block.ToCompact()
+		blockOut <- *block
 	}
 
 	errOut <- nil
