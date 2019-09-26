@@ -161,14 +161,14 @@ func main() {
 	}
 
 	// Get the sapling activation height from the RPC
-	saplingHeight, chainName, err := common.GetSaplingInfo(rpcClient)
+	saplingHeight, chainName, branchID, err := common.GetSaplingInfo(rpcClient)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err,
 		}).Warn("Unable to get sapling activation height")
 	}
 
-	log.WithField("saplingHeight", saplingHeight).Info("Got sapling height ", saplingHeight, " chain ", chainName)
+	log.Info("Got sapling height ", saplingHeight, " chain ", chainName, " branchID ", branchID)
 
 	// Compact transaction service initialization
 	service, err := frontend.NewSQLiteStreamer(rpcClient, log)
