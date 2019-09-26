@@ -39,6 +39,16 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) error {
 		c.LastBlock = height - 1
 	}
 
+	// If we're adding a block in the middle of the cache, remove all
+	// blocks after it, since this might be a reorg, and we don't want
+	// Any outdated blocks returned
+	if height >= c.FirstBlock && height <= c.LastBlock {
+		for i := height; i <= c.LastBlock; i++ {
+			delete(c.m, i)
+		}
+		c.LastBlock = height - 1
+	}
+
 	// Don't allow out-of-order blocks. This is more of a sanity check than anything
 	// If there is a reorg, then the ingestor needs to handle it.
 	if c.m[height-1] != nil && !bytes.Equal(block.PrevHash, c.m[height-1].Hash) {
