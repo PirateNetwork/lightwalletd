@@ -27,38 +27,24 @@ type SqlStreamer struct {
 	log    *logrus.Entry
 }
 
-func NewSQLiteStreamer(client *rpcclient.Client, log *logrus.Entry) (walletrpc.CompactTxStreamerServer, error) {
-	return &SqlStreamer{common.New(100000), client, log}, nil
+func NewSQLiteStreamer(client *rpcclient.Client, cache *common.BlockCache, log *logrus.Entry) (walletrpc.CompactTxStreamerServer, error) {
+	return &SqlStreamer{cache, client, log}, nil
 }
 
 func (s *SqlStreamer) GracefulStop() error {
 	return nil
 }
 
+func (s *SqlStreamer) GetCache() *common.BlockCache {
+	return s.cache
+}
+
 func (s *SqlStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
-	result, rpcErr := s.client.RawRequest("getinfo", make([]json.RawMessage, 0))
+	latestBlock := s.cache.GetLatestBlock()
 
-	var err error
-	var errCode int64
-
-	// For some reason, the error responses are not JSON
-	if rpcErr != nil {
-		errParts := strings.SplitN(rpcErr.Error(), ":", 2)
-		errCode, err = strconv.ParseInt(errParts[0], 10, 32)
-		//Check to see if we are requesting a height the zcashd doesn't have yet
-		if err == nil && errCode == -8 {
-			return nil, errors.New("Don't have the requested block")
-		}
-		return nil, err
+	if latestBlock == -1 {
+		return nil, errors.New("Cache is empty. Server is probably not yet ready.")
 	}
-
-	var f interface{}
-	err = json.Unmarshal(result, &f)
-	if err != nil {
-		return nil, err
-	}
-
-	latestBlock := f.(map[string]interface{})["blocks"].(float64)
 
 	// TODO: also return block hashes here
 	return &walletrpc.BlockID{Height: uint64(latestBlock)}, nil
@@ -243,7 +229,7 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 
 // GetLightdInfo gets the LightWalletD (this server) info
 func (s *SqlStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
-	saplingHeight, chainName, consensusBranchId, err := common.GetSaplingInfo(s.client)
+	saplingHeight, blockHeight, chainName, consensusBranchId, err := common.GetSaplingInfo(s.client)
 
 	if err != nil {
 		s.log.WithFields(logrus.Fields{
@@ -261,6 +247,7 @@ func (s *SqlStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*
 		ChainName:               chainName,
 		SaplingActivationHeight: uint64(saplingHeight),
 		ConsensusBranchId:       consensusBranchId,
+		BlockHeight:             uint64(blockHeight),
 	}, nil
 }
 

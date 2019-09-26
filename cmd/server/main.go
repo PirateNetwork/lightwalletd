@@ -23,6 +23,8 @@ import (
 var log *logrus.Entry
 var logger = logrus.New()
 
+var cacheSize = 10000
+
 func init() {
 	logger.SetFormatter(&logrus.TextFormatter{
 		//DisableColors:          true,
@@ -77,7 +79,6 @@ func loggerFromContext(ctx context.Context) *logrus.Entry {
 
 type Options struct {
 	bindAddr      string `json:"bind_address,omitempty"`
-	dbPath        string `json:"db_path"`
 	tlsCertPath   string `json:"tls_cert_path,omitempty"`
 	tlsKeyPath    string `json:"tls_cert_key,omitempty"`
 	logLevel      uint64 `json:"log_level,omitempty"`
@@ -88,7 +89,6 @@ type Options struct {
 func main() {
 	opts := &Options{}
 	flag.StringVar(&opts.bindAddr, "bind-addr", "127.0.0.1:9067", "the address to listen on")
-	flag.StringVar(&opts.dbPath, "db-path", "", "the path to a sqlite database file")
 	flag.StringVar(&opts.tlsCertPath, "tls-cert", "", "the path to a TLS certificate (optional)")
 	flag.StringVar(&opts.tlsKeyPath, "tls-key", "", "the path to a TLS key file (optional)")
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
@@ -98,7 +98,7 @@ func main() {
 	// TODO support config from file and env vars
 	flag.Parse()
 
-	if opts.dbPath == "" || opts.zcashConfPath == "" {
+	if opts.zcashConfPath == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -161,7 +161,7 @@ func main() {
 	}
 
 	// Get the sapling activation height from the RPC
-	saplingHeight, chainName, branchID, err := common.GetSaplingInfo(rpcClient)
+	saplingHeight, blockHeight, chainName, branchID, err := common.GetSaplingInfo(rpcClient)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err,
@@ -170,12 +170,24 @@ func main() {
 
 	log.Info("Got sapling height ", saplingHeight, " chain ", chainName, " branchID ", branchID)
 
+	// Initialize the cache
+	cache := common.NewBlockCache(cacheSize)
+
+	stopChan := make(chan bool, 1)
+
+	// Start the block cache importer at latestblock - 100k(cache size)
+	cacheStart := blockHeight - cacheSize
+	if cacheStart < saplingHeight {
+		cacheStart = saplingHeight
+	}
+
+	go common.BlockIngestor(rpcClient, cache, log, stopChan, cacheStart)
+
 	// Compact transaction service initialization
-	service, err := frontend.NewSQLiteStreamer(rpcClient, log)
+	service, err := frontend.NewSQLiteStreamer(rpcClient, cache, log)
 	if err != nil {
 		log.WithFields(logrus.Fields{
-			"db_path": opts.dbPath,
-			"error":   err,
+			"error": err,
 		}).Fatal("couldn't create SQL backend")
 	}
 	defer service.(*frontend.SqlStreamer).GracefulStop()
@@ -200,7 +212,10 @@ func main() {
 		log.WithFields(logrus.Fields{
 			"signal": s.String(),
 		}).Info("caught signal, stopping gRPC server")
+		// Stop the server
 		server.GracefulStop()
+		// Stop the block ingestor
+		stopChan <- true
 	}()
 
 	log.Infof("Starting gRPC server on %s", opts.bindAddr)

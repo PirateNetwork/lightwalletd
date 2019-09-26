@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"sync"
 
 	"github.com/adityapk00/lightwalletd/walletrpc"
 	"github.com/pkg/errors"
@@ -14,9 +15,11 @@ type BlockCache struct {
 	LastBlock  int
 
 	m map[int]*walletrpc.CompactBlock
+
+	mutex sync.RWMutex
 }
 
-func New(maxEntries int) *BlockCache {
+func NewBlockCache(maxEntries int) *BlockCache {
 	return &BlockCache{
 		MaxEntries: maxEntries,
 		FirstBlock: -1,
@@ -26,25 +29,18 @@ func New(maxEntries int) *BlockCache {
 }
 
 func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
 	//println("Cache add", height)
 	if c.FirstBlock == -1 && c.LastBlock == -1 {
 		// If this is the first block, prep the data structure
 		c.FirstBlock = height
 		c.LastBlock = height - 1
-	} else if height >= c.FirstBlock && height <= c.LastBlock {
-		// Overwriting an existing entry. If so, then remove all
-		// subsequent blocks, since this might be a reorg
-		for i := height; i <= c.LastBlock; i++ {
-			//println("Deleteing at height", i)
-			delete(c.m, i)
-		}
-		c.LastBlock = height - 1
 	}
 
-	if height != c.LastBlock+1 {
-		return errors.New("Blocks need to be added sequentially")
-	}
-
+	// Don't allow out-of-order blocks. This is more of a sanity check than anything
+	// If there is a reorg, then the ingestor needs to handle it.
 	if c.m[height-1] != nil && !bytes.Equal(block.PrevHash, c.m[height-1].Hash) {
 		return errors.New("Prev hash of the block didn't match")
 	}
@@ -66,6 +62,9 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) error {
 }
 
 func (c *BlockCache) Get(height int) *walletrpc.CompactBlock {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
 	//println("Cache get", height)
 	if c.LastBlock == -1 || c.FirstBlock == -1 {
 		return nil
@@ -78,4 +77,11 @@ func (c *BlockCache) Get(height int) *walletrpc.CompactBlock {
 
 	//println("Cache returned")
 	return c.m[height]
+}
+
+func (c *BlockCache) GetLatestBlock() int {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	return c.LastBlock
 }
