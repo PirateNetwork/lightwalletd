@@ -97,11 +97,9 @@ func getBlockFromRPC(rpcClient *rpcclient.Client, height int) (*walletrpc.Compac
 
 func BlockIngestor(rpcClient *rpcclient.Client, cache *BlockCache, log *logrus.Entry,
 	stopChan chan bool, startHeight int) {
-	reorgCount := -1
+	reorgCount := 0
 	height := startHeight
 	timeoutCount := 0
-	hash := ""
-	phash := ""
 
 	// Start listening for new blocks
 	for {
@@ -112,9 +110,14 @@ func BlockIngestor(rpcClient *rpcclient.Client, cache *BlockCache, log *logrus.E
 		case <-time.After(15 * time.Second):
 			for {
 				if reorgCount > 0 {
-					reorgCount = -1
 					height -= 10
 				}
+
+				if reorgCount > 10 {
+					log.Error("Reorg exceeded max of 100 blocks! Help!")
+					return
+				}
+
 				block, err := getBlockFromRPC(rpcClient, height)
 
 				if err != nil {
@@ -140,11 +143,13 @@ func BlockIngestor(rpcClient *rpcclient.Client, cache *BlockCache, log *logrus.E
 					log.Info("Ingestor adding block to cache: ", height)
 					err = cache.Add(height, block)
 
-					phash = hex.EncodeToString(block.PrevHash)
-
 					//check for reorgs once we have inital block hash from startup
-					if err != nil || (hash != phash && reorgCount != -1) {
+					if err != nil {
 						reorgCount++
+
+						hash := hex.EncodeToString(block.Hash)
+						phash := hex.EncodeToString(block.PrevHash)
+
 						log.WithFields(logrus.Fields{
 							"height":          height,
 							"hash(reversed)":  hash,
@@ -152,14 +157,10 @@ func BlockIngestor(rpcClient *rpcclient.Client, cache *BlockCache, log *logrus.E
 							"reorg":           reorgCount,
 						}).Warn("REORG")
 					} else {
-						hash = hex.EncodeToString(block.Hash)
-					}
-
-					if reorgCount == -1 {
-						hash = hex.EncodeToString(block.Hash)
 						reorgCount = 0
+
+						height++
 					}
-					height++
 				} else {
 					break
 				}
