@@ -133,16 +133,17 @@ func BlockIngestor(rpcClient *rpcclient.Client, cache *BlockCache, log *logrus.E
 				}
 
 				if block != nil {
-					log.Info("Ingestor adding block to cache: ", height)
-					cache.Add(height, block)
 					if timeoutCount > 0 {
 						timeoutCount--
 					}
 
+					log.Info("Ingestor adding block to cache: ", height)
+					err = cache.Add(height, block)
+
 					phash = hex.EncodeToString(block.PrevHash)
 
 					//check for reorgs once we have inital block hash from startup
-					if hash != phash && reorgCount != -1 {
+					if err != nil || (hash != phash && reorgCount != -1) {
 						reorgCount++
 						log.WithFields(logrus.Fields{
 							"height":          height,
