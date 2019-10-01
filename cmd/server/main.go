@@ -23,7 +23,7 @@ import (
 var log *logrus.Entry
 var logger = logrus.New()
 
-var cacheSize = 20000
+var cacheSize = 10000
 
 func init() {
 	logger.SetFormatter(&logrus.TextFormatter{
