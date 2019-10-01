@@ -5,8 +5,14 @@ import (
 	"sync"
 
 	"github.com/adityapk00/lightwalletd/walletrpc"
+	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 )
+
+type BlockCacheEntry struct {
+	data []byte
+	hash []byte
+}
 
 type BlockCache struct {
 	MaxEntries int
@@ -14,7 +20,7 @@ type BlockCache struct {
 	FirstBlock int
 	LastBlock  int
 
-	m map[int]*walletrpc.CompactBlock
+	m map[int]*BlockCacheEntry
 
 	mutex sync.RWMutex
 }
@@ -24,7 +30,7 @@ func NewBlockCache(maxEntries int) *BlockCache {
 		MaxEntries: maxEntries,
 		FirstBlock: -1,
 		LastBlock:  -1,
-		m:          make(map[int]*walletrpc.CompactBlock),
+		m:          make(map[int]*BlockCacheEntry),
 	}
 }
 
@@ -51,12 +57,21 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) error {
 
 	// Don't allow out-of-order blocks. This is more of a sanity check than anything
 	// If there is a reorg, then the ingestor needs to handle it.
-	if c.m[height-1] != nil && !bytes.Equal(block.PrevHash, c.m[height-1].Hash) {
+	if c.m[height-1] != nil && !bytes.Equal(block.PrevHash, c.m[height-1].hash) {
 		return errors.New("Prev hash of the block didn't match")
 	}
 
 	// Add the entry and update the counters
-	c.m[height] = block
+	data, err := proto.Marshal(block)
+	if err != nil {
+		println("Error marshalling block!")
+		return nil
+	}
+
+	c.m[height] = &BlockCacheEntry{
+		data: data,
+		hash: block.GetHash(),
+	}
 
 	c.LastBlock = height
 
@@ -86,7 +101,14 @@ func (c *BlockCache) Get(height int) *walletrpc.CompactBlock {
 	}
 
 	//println("Cache returned")
-	return c.m[height]
+	serialized := &walletrpc.CompactBlock{}
+	err := proto.Unmarshal(c.m[height].data, serialized)
+	if err != nil {
+		println("Error unmarshalling compact block")
+		return nil
+	}
+
+	return serialized
 }
 
 func (c *BlockCache) GetLatestBlock() int {
