@@ -17,7 +17,13 @@ This version of zeclite lightwalletd extends lightwalletd and:
 
 0. First, install [Go >= 1.11](https://golang.org/dl/#stable).
 
-1. You need to run a zcash full node with the following options in zcash.conf
+1. Generate a TLS self-signed certificate
+```
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
+```
+Answer the certificate questions to generate the self-signed certificate
+
+2. You need to run a zcash full node with the following options in zcash.conf
 ```
 server=1
 testnet=1
@@ -30,12 +36,13 @@ txindex=1
 insightexplorer=1
 ```
 
-2. Run the frontend:
+3. Run the frontend:
+You'll need to use the certificate generated from step 1
 ```
-go run cmd/server/main.go -bind-addr 127.0.0.1:9067 -conf-file ~/.zcash/zcash.conf
+go run cmd/server/main.go -bind-addr 127.0.0.1:9067 -conf-file ~/.zcash/zcash.conf  -tls-cert cert.pem -tls-key key.pem
 ```
 
-3. Point the `zecwallet-cli` to this server
+4. Point the `zecwallet-cli` to this server
 ```
-./zeclite-cli --server 127.0.0.1:9067
+./zecwallet-cli --server https://127.0.0.1:9067 --dangerous
 ```
