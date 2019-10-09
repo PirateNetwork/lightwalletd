@@ -26,11 +26,10 @@ Answer the certificate questions to generate the self-signed certificate
 #### 2. You need to run a zcash full node with the following options in zcash.conf
 ```
 server=1
-testnet=1
 rpcuser=user
 rpcpassword=password
 rpcbind=127.0.0.1
-rpcport=18232
+rpcport=8232
 experimentalfeatures=1
 txindex=1
 insightexplorer=1
