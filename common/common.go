@@ -141,20 +141,22 @@ func BlockIngestor(rpcClient *rpcclient.Client, cache *BlockCache, log *logrus.E
 					}
 
 					log.Info("Ingestor adding block to cache: ", height)
-					err = cache.Add(height, block)
+					err, reorg := cache.Add(height, block)
+
+					if err != nil {
+						log.Error("Error adding block to cache: ", err)
+						continue
+					}
 
 					//check for reorgs once we have inital block hash from startup
-					if err != nil {
+					if reorg {
 						reorgCount++
 
-						hash := hex.EncodeToString(block.Hash)
-						phash := hex.EncodeToString(block.PrevHash)
-
 						log.WithFields(logrus.Fields{
-							"height":          height,
-							"hash(reversed)":  hash,
-							"phash(reversed)": phash,
-							"reorg":           reorgCount,
+							"height": height,
+							"hash":   displayHash(block.Hash),
+							"phash":  displayHash(block.PrevHash),
+							"reorg":  reorgCount,
 						}).Warn("REORG")
 					} else {
 						reorgCount = 0
@@ -207,4 +209,16 @@ func GetBlockRange(rpcClient *rpcclient.Client, cache *BlockCache,
 	}
 
 	errOut <- nil
+}
+
+func displayHash(hash []byte) string {
+	rhash := make([]byte, len(hash))
+	copy(rhash, hash)
+	// Reverse byte order
+	for i := 0; i < len(rhash)/2; i++ {
+		j := len(rhash) - 1 - i
+		rhash[i], rhash[j] = rhash[j], rhash[i]
+	}
+
+	return hex.EncodeToString(rhash)
 }

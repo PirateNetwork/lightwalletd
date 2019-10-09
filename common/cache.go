@@ -6,7 +6,6 @@ import (
 
 	"github.com/adityapk00/lightwalletd/walletrpc"
 	"github.com/golang/protobuf/proto"
-	"github.com/pkg/errors"
 )
 
 type BlockCacheEntry struct {
@@ -34,7 +33,7 @@ func NewBlockCache(maxEntries int) *BlockCache {
 	}
 }
 
-func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) error {
+func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) (error, bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -58,14 +57,14 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) error {
 	// Don't allow out-of-order blocks. This is more of a sanity check than anything
 	// If there is a reorg, then the ingestor needs to handle it.
 	if c.m[height-1] != nil && !bytes.Equal(block.PrevHash, c.m[height-1].hash) {
-		return errors.New("Prev hash of the block didn't match")
+		return nil, true
 	}
 
 	// Add the entry and update the counters
 	data, err := proto.Marshal(block)
 	if err != nil {
 		println("Error marshalling block!")
-		return nil
+		return err, false
 	}
 
 	c.m[height] = &BlockCacheEntry{
@@ -83,7 +82,7 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) error {
 	}
 
 	//println("Cache size is ", len(c.m))
-	return nil
+	return nil, false
 }
 
 func (c *BlockCache) Get(height int) *walletrpc.CompactBlock {
