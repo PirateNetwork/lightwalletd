@@ -23,8 +23,6 @@ import (
 var log *logrus.Entry
 var logger = logrus.New()
 
-var cacheSize = 30000
-
 func init() {
 	logger.SetFormatter(&logrus.TextFormatter{
 		//DisableColors:          true,
@@ -84,6 +82,7 @@ type Options struct {
 	logLevel      uint64 `json:"log_level,omitempty"`
 	logPath       string `json:"log_file,omitempty"`
 	zcashConfPath string `json:"zcash_conf,omitempty"`
+	cacheSize     int    `json:"zcash_conf,omitempty"`
 }
 
 func main() {
@@ -94,6 +93,8 @@ func main() {
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
 	flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
 	flag.StringVar(&opts.zcashConfPath, "conf-file", "", "conf file to pull RPC creds from")
+	flag.IntVar(&opts.cacheSize, "cache-size", 40000, "number of blocks to hold in the cache")
+
 	// TODO prod metrics
 	// TODO support config from file and env vars
 	flag.Parse()
@@ -171,12 +172,12 @@ func main() {
 	log.Info("Got sapling height ", saplingHeight, " chain ", chainName, " branchID ", branchID)
 
 	// Initialize the cache
-	cache := common.NewBlockCache(cacheSize)
+	cache := common.NewBlockCache(opts.cacheSize)
 
 	stopChan := make(chan bool, 1)
 
 	// Start the block cache importer at latestblock - 100k(cache size)
-	cacheStart := blockHeight - cacheSize
+	cacheStart := blockHeight - opts.cacheSize
 	if cacheStart < saplingHeight {
 		cacheStart = saplingHeight
 	}
