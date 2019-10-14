@@ -104,6 +104,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	if opts.tlsCertPath == "" || opts.tlsKeyPath == "" {
+		println("Please specify a TLS certificate/key to use. You can use a self-signed certificate.")
+		println("See 'https://github.com/adityapk00/lightwalletd/blob/master/README.md#running-your-own-zeclite-lightwalletd'")
+		os.Exit(1)
+	}
+
 	if opts.logPath != "" {
 		// instead write parsable logs for logstash/splunk/etc
 		output, err := os.OpenFile(opts.logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
