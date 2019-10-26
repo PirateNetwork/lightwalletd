@@ -79,10 +79,11 @@ type Options struct {
 	bindAddr      string `json:"bind_address,omitempty"`
 	tlsCertPath   string `json:"tls_cert_path,omitempty"`
 	tlsKeyPath    string `json:"tls_cert_key,omitempty"`
+	noTLS         bool   `json:no_tls,omitempty`
 	logLevel      uint64 `json:"log_level,omitempty"`
 	logPath       string `json:"log_file,omitempty"`
 	zcashConfPath string `json:"zcash_conf,omitempty"`
-	cacheSize     int    `json:"zcash_conf,omitempty"`
+	cacheSize     int    `json:"cache_size,omitempty"`
 }
 
 func main() {
@@ -90,6 +91,7 @@ func main() {
 	flag.StringVar(&opts.bindAddr, "bind-addr", "127.0.0.1:9067", "the address to listen on")
 	flag.StringVar(&opts.tlsCertPath, "tls-cert", "", "the path to a TLS certificate (optional)")
 	flag.StringVar(&opts.tlsKeyPath, "tls-key", "", "the path to a TLS key file (optional)")
+	flag.BoolVar(&opts.noTLS, "no-tls", false, "Disable TLS, serve un-encrypted traffic.")
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
 	flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
 	flag.StringVar(&opts.zcashConfPath, "conf-file", "", "conf file to pull RPC creds from")
@@ -104,7 +106,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if opts.tlsCertPath == "" || opts.tlsKeyPath == "" {
+	if !opts.noTLS && (opts.tlsCertPath == "" || opts.tlsKeyPath == "") {
 		println("Please specify a TLS certificate/key to use. You can use a self-signed certificate.")
 		println("See 'https://github.com/adityapk00/lightwalletd/blob/master/README.md#running-your-own-zeclite-lightwalletd'")
 		os.Exit(1)
@@ -129,7 +131,7 @@ func main() {
 	// gRPC initialization
 	var server *grpc.Server
 
-	if opts.tlsCertPath != "" && opts.tlsKeyPath != "" {
+	if !opts.noTLS && (opts.tlsCertPath != "" && opts.tlsKeyPath != "") {
 		transportCreds, err := credentials.NewServerTLSFromFile(opts.tlsCertPath, opts.tlsKeyPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
