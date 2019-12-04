@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -51,6 +52,16 @@ func (s *SqlStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 }
 
 func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetAddressTxidsServer) error {
+	var err error
+	var errCode int64
+
+	// Test to make sure Address is a single t address
+	match, err := regexp.Match("^t[a-zA-Z0-9]{34}$", []byte(addressBlockFilter.Address))
+	if err != nil || !match {
+		s.log.Errorf("Unrecognized address: %s", addressBlockFilter.Address)
+		return nil
+	}
+
 	params := make([]json.RawMessage, 1)
 	st := "{\"addresses\": [\"" + addressBlockFilter.Address + "\"]," +
 		"\"start\": " + strconv.FormatUint(addressBlockFilter.Range.Start.Height, 10) +
@@ -59,9 +70,6 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 	params[0] = json.RawMessage(st)
 
 	result, rpcErr := s.client.RawRequest("getaddresstxids", params)
-
-	var err error
-	var errCode int64
 
 	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
