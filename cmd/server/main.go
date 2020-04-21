@@ -4,11 +4,14 @@ import (
 	"context"
 	"flag"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -23,6 +26,12 @@ import (
 var log *logrus.Entry
 var logger = logrus.New()
 
+var (
+	promRegistry = prometheus.NewRegistry()
+)
+
+var metrics = common.GetPrometheusMetrics()
+
 func init() {
 	logger.SetFormatter(&logrus.TextFormatter{
 		//DisableColors:          true,
@@ -33,6 +42,8 @@ func init() {
 	log = logger.WithFields(logrus.Fields{
 		"app": "frontend-grpc",
 	})
+
+	promRegistry.MustRegister(metrics.LatestBlockCounter)
 }
 
 // TODO stream logging
@@ -193,7 +204,7 @@ func main() {
 	go common.BlockIngestor(rpcClient, cache, log, stopChan, cacheStart)
 
 	// Compact transaction service initialization
-	service, err := frontend.NewSQLiteStreamer(rpcClient, cache, log)
+	service, err := frontend.NewSQLiteStreamer(rpcClient, cache, log, metrics)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err,
@@ -225,6 +236,15 @@ func main() {
 		server.GracefulStop()
 		// Stop the block ingestor
 		stopChan <- true
+	}()
+
+	// Start the metrics server
+	go func() {
+		http.Handle("/metrics", promhttp.HandlerFor(
+			promRegistry,
+			promhttp.HandlerOpts{},
+		))
+		log.Fatal(http.ListenAndServe(":1234", nil))
 	}()
 
 	log.Infof("Starting gRPC server on %s", opts.bindAddr)

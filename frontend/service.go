@@ -23,13 +23,14 @@ var (
 
 // the service type
 type SqlStreamer struct {
-	cache  *common.BlockCache
-	client *rpcclient.Client
-	log    *logrus.Entry
+	cache   *common.BlockCache
+	client  *rpcclient.Client
+	log     *logrus.Entry
+	metrics *common.PrometheusMetrics
 }
 
-func NewSQLiteStreamer(client *rpcclient.Client, cache *common.BlockCache, log *logrus.Entry) (walletrpc.CompactTxStreamerServer, error) {
-	return &SqlStreamer{cache, client, log}, nil
+func NewSQLiteStreamer(client *rpcclient.Client, cache *common.BlockCache, log *logrus.Entry, metrics *common.PrometheusMetrics) (walletrpc.CompactTxStreamerServer, error) {
+	return &SqlStreamer{cache, client, log, metrics}, nil
 }
 
 func (s *SqlStreamer) GracefulStop() error {
@@ -46,6 +47,8 @@ func (s *SqlStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 	if latestBlock == -1 {
 		return nil, errors.New("Cache is empty. Server is probably not yet ready.")
 	}
+
+	s.metrics.LatestBlockCounter.Inc()
 
 	// TODO: also return block hashes here
 	return &walletrpc.BlockID{Height: uint64(latestBlock)}, nil

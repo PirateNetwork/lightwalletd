@@ -2,3 +2,4 @@ main
 grpcfrontend
 cert.pem
 key.pem
+.vscode
