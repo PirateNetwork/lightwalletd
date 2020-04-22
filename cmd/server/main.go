@@ -44,6 +44,9 @@ func init() {
 	})
 
 	promRegistry.MustRegister(metrics.LatestBlockCounter)
+	promRegistry.MustRegister(metrics.TotalErrors)
+	promRegistry.MustRegister(metrics.TotalBlocksServedConter)
+	promRegistry.MustRegister(metrics.SendTransactionsCounter)
 }
 
 // TODO stream logging
@@ -244,7 +247,7 @@ func main() {
 			promRegistry,
 			promhttp.HandlerOpts{},
 		))
-		log.Fatal(http.ListenAndServe(":1234", nil))
+		log.Fatal(http.ListenAndServe(":2234", nil))
 	}()
 
 	log.Infof("Starting gRPC server on %s", opts.bindAddr)

@@ -45,6 +45,8 @@ func (s *SqlStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 	latestBlock := s.cache.GetLatestBlock()
 
 	if latestBlock == -1 {
+		s.metrics.TotalErrors.Inc()
+
 		return nil, errors.New("Cache is empty. Server is probably not yet ready.")
 	}
 
@@ -61,6 +63,8 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 	// Test to make sure Address is a single t address
 	match, err := regexp.Match("^t[a-zA-Z0-9]{34}$", []byte(addressBlockFilter.Address))
 	if err != nil || !match {
+		s.metrics.TotalErrors.Inc()
+
 		s.log.Errorf("Unrecognized address: %s", addressBlockFilter.Address)
 		return nil
 	}
@@ -76,6 +80,8 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 
 	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
+		s.metrics.TotalErrors.Inc()
+
 		s.log.Errorf("Got error: %s", rpcErr.Error())
 		errParts := strings.SplitN(rpcErr.Error(), ":", 2)
 		errCode, err = strconv.ParseInt(errParts[0], 10, 32)
@@ -106,6 +112,8 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 
 		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: txid})
 		if err != nil {
+			s.metrics.TotalErrors.Inc()
+
 			s.log.Errorf("Got error: %s", err.Error())
 			return nil
 		}
@@ -124,6 +132,7 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 	// Precedence: a hash is more specific than a height. If we have it, use it first.
 	if id.Hash != nil {
 		// TODO: Get block by hash
+		s.metrics.TotalErrors.Inc()
 
 		return nil, errors.New("GetBlock by Hash is not yet implemented")
 	} else {
@@ -133,6 +142,7 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 			return nil, err
 		}
 
+		s.metrics.TotalBlocksServedConter.Inc()
 		return cBlock, err
 	}
 
@@ -148,8 +158,10 @@ func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 		select {
 		case err := <-errChan:
 			// this will also catch context.DeadlineExceeded from the timeout
+			s.metrics.TotalErrors.Inc()
 			return err
 		case cBlock := <-blockChan:
+			s.metrics.TotalBlocksServedConter.Inc()
 			err := resp.Send(&cBlock)
 			if err != nil {
 				return err
@@ -181,6 +193,8 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 		var errCode int64
 		// For some reason, the error responses are not JSON
 		if rpcErr != nil {
+			s.metrics.TotalErrors.Inc()
+
 			s.log.Errorf("Got error: %s", rpcErr.Error())
 			errParts := strings.SplitN(rpcErr.Error(), ":", 2)
 			errCode, err = strconv.ParseInt(errParts[0], 10, 32)
@@ -211,6 +225,8 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 
 		// For some reason, the error responses are not JSON
 		if rpcErr != nil {
+			s.metrics.TotalErrors.Inc()
+
 			s.log.Errorf("Got error: %s", rpcErr.Error())
 			errParts := strings.SplitN(rpcErr.Error(), ":", 2)
 			errCode, err = strconv.ParseInt(errParts[0], 10, 32)
@@ -231,6 +247,8 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 	}
 
 	if txf.Block.Hash != nil {
+		s.metrics.TotalErrors.Inc()
+
 		s.log.Error("Can't GetTransaction with a blockhash+num. Please call GetTransaction with txid")
 		return nil, errors.New("Can't GetTransaction with a blockhash+num. Please call GetTransaction with txid")
 	}
@@ -246,6 +264,8 @@ func (s *SqlStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*
 		s.log.WithFields(logrus.Fields{
 			"error": err,
 		}).Warn("Unable to get sapling activation height")
+
+		s.metrics.TotalErrors.Inc()
 		return nil, err
 	}
 
@@ -303,8 +323,12 @@ func (s *SqlStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 
 	// TODO these are called Error but they aren't at the moment.
 	// A success will return code 0 and message txhash.
-	return &walletrpc.SendResponse{
+	resp := &walletrpc.SendResponse{
 		ErrorCode:    int32(errCode),
 		ErrorMessage: errMsg,
-	}, nil
+	}
+
+	s.metrics.SendTransactionsCounter.Inc()
+
+	return resp, nil
 }
