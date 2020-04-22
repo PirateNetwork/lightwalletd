@@ -95,6 +95,51 @@ func getBlockFromRPC(rpcClient *rpcclient.Client, height int) (*walletrpc.Compac
 	return block.ToCompact(), nil
 }
 
+// HistoricalBlockIngestor adds historical blocks in reverse order.
+func HistoricalBlockIngestor(rpcClient *rpcclient.Client, cache *BlockCache, log *logrus.Entry,
+	startBlock int, totalBlocks int, saplingHeight int) {
+	// Wait for at least some blocks in the cache
+	for {
+		if cache.FirstBlock == -1 {
+			println("Historical block ingestor sleeping for 15s")
+			time.Sleep(15 * time.Second)
+		} else {
+			break
+		}
+	}
+
+	// We don't have to worry about reorgs, becaue we'll be at least 100 blocks in the history, where there are no reorgs
+	for height := startBlock; height > (startBlock-totalBlocks) && height > saplingHeight; height-- {
+		block, err := getBlockFromRPC(rpcClient, height)
+
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"height": height,
+				"error":  err,
+			}).Warn("error with getblock for historical block")
+
+			break
+		}
+
+		if block != nil {
+			log.Info("Historical Ingestor adding block to cache: ", height)
+
+			err, full := cache.AddHistorical(height, block)
+			if full {
+				log.Info("Historical Ingestor stopping since cache is full")
+				break
+			}
+
+			if err != nil {
+				log.Error("Error adding historical block to cache: ", err)
+				break
+			}
+		}
+	}
+
+	log.Info("Finished adding historical blocks")
+}
+
 func BlockIngestor(rpcClient *rpcclient.Client, cache *BlockCache, log *logrus.Entry,
 	stopChan chan bool, startHeight int) {
 	reorgCount := 0

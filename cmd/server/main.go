@@ -198,13 +198,18 @@ func main() {
 
 	stopChan := make(chan bool, 1)
 
-	// Start the block cache importer at latestblock - 100k(cache size)
-	cacheStart := blockHeight - opts.cacheSize
+	// Start the block cache importer at 100 blocks, so that the server is ready immediately.
+	// The remaining blocks are added historically
+	cacheStart := blockHeight - 100
 	if cacheStart < saplingHeight {
 		cacheStart = saplingHeight
 	}
 
+	// Start the ingestor
 	go common.BlockIngestor(rpcClient, cache, log, stopChan, cacheStart)
+
+	// Add historical blocks also
+	go common.HistoricalBlockIngestor(rpcClient, cache, log, cacheStart-1, opts.cacheSize, saplingHeight)
 
 	// Compact transaction service initialization
 	service, err := frontend.NewSQLiteStreamer(rpcClient, cache, log, metrics)

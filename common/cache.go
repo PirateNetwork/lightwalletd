@@ -2,10 +2,12 @@ package common
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 
 	"github.com/adityapk00/lightwalletd/walletrpc"
 	"github.com/golang/protobuf/proto"
+	"github.com/pkg/errors"
 )
 
 type BlockCacheEntry struct {
@@ -31,6 +33,37 @@ func NewBlockCache(maxEntries int) *BlockCache {
 		LastBlock:  -1,
 		m:          make(map[int]*BlockCacheEntry),
 	}
+}
+
+func (c *BlockCache) AddHistorical(height int, block *walletrpc.CompactBlock) (error, bool) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	// If the cache is full, then we'll ignore this block
+	if c.LastBlock-c.FirstBlock+1 > c.MaxEntries {
+		return nil, true
+	}
+
+	// We can only add one block before the first block.
+	if height != c.FirstBlock-1 {
+		fmt.Printf("Can't add historical block out of order. adding %d, firstblock is %d", height, c.FirstBlock)
+		return errors.New("Incorrect historical block order"), false
+	}
+
+	// Add the entry and update the counters
+	data, err := proto.Marshal(block)
+	if err != nil {
+		println("Error marshalling block!")
+		return err, false
+	}
+
+	c.m[height] = &BlockCacheEntry{
+		data: data,
+		hash: block.GetHash(),
+	}
+	c.FirstBlock = height
+
+	return nil, false
 }
 
 func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) (error, bool) {
