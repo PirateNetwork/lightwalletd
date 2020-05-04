@@ -47,6 +47,8 @@ func init() {
 	promRegistry.MustRegister(metrics.TotalErrors)
 	promRegistry.MustRegister(metrics.TotalBlocksServedConter)
 	promRegistry.MustRegister(metrics.SendTransactionsCounter)
+	promRegistry.MustRegister(metrics.TotalSaplingParamsCounter)
+	promRegistry.MustRegister(metrics.TotalSproutParamsCounter)
 }
 
 // TODO stream logging
@@ -254,6 +256,10 @@ func main() {
 		))
 		log.Fatal(http.ListenAndServe(":2234", nil))
 	}()
+
+	// Start the download params handler
+	log.Infof("Starting params handler")
+	go common.ParamsDownloadHandler(metrics)
 
 	log.Infof("Starting gRPC server on %s", opts.bindAddr)
 

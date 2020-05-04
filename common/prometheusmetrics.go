@@ -4,10 +4,12 @@ import "github.com/prometheus/client_golang/prometheus"
 
 // PrometheusMetrics is a list of collected Prometheus Counters and Guages that will be exported
 type PrometheusMetrics struct {
-	LatestBlockCounter      prometheus.Counter
-	TotalBlocksServedConter prometheus.Counter
-	SendTransactionsCounter prometheus.Counter
-	TotalErrors             prometheus.Counter
+	LatestBlockCounter        prometheus.Counter
+	TotalBlocksServedConter   prometheus.Counter
+	SendTransactionsCounter   prometheus.Counter
+	TotalErrors               prometheus.Counter
+	TotalSaplingParamsCounter prometheus.Counter
+	TotalSproutParamsCounter  prometheus.Counter
 }
 
 func GetPrometheusMetrics() *PrometheusMetrics {
@@ -30,6 +32,16 @@ func GetPrometheusMetrics() *PrometheusMetrics {
 	m.TotalErrors = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "lightwalletd_total_errors",
 		Help: "Total number of errors seen by lightwalletd",
+	})
+
+	m.TotalSaplingParamsCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "params_sapling_total",
+		Help: "Total number of params downloads for sapling params",
+	})
+
+	m.TotalSproutParamsCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "params_sprout_total",
+		Help: "Total number of params downloasd for sprout params",
 	})
 
 	return m
