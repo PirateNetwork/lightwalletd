@@ -36,6 +36,5 @@ func ParamsDownloadHandler(prommetrics *PrometheusMetrics) {
 	metrics = prommetrics
 	http.HandleFunc("/params/", paramsHandler)
 
-	println("Handling at params")
 	http.ListenAndServe(":8090", nil)
 }
