@@ -60,6 +60,13 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 	var err error
 	var errCode int64
 
+	s.log.WithFields(logrus.Fields{
+		"method":  "GetAddressTxids",
+		"address": addressBlockFilter.Address,
+		"start":   addressBlockFilter.Range.Start.Height,
+		"end":     addressBlockFilter.Range.End.Height,
+	}).Info("Service")
+
 	// Test to make sure Address is a single t address
 	match, err := regexp.Match("^t[a-zA-Z0-9]{34}$", []byte(addressBlockFilter.Address))
 	if err != nil || !match {
@@ -129,6 +136,12 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 		return nil, ErrUnspecified
 	}
 
+	s.log.WithFields(logrus.Fields{
+		"method": "GetBlockRange",
+		"start":  id.Height,
+		"end":    id.Height,
+	}).Info("Service")
+
 	// Precedence: a hash is more specific than a height. If we have it, use it first.
 	if id.Hash != nil {
 		// TODO: Get block by hash
@@ -152,6 +165,12 @@ func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 	blockChan := make(chan walletrpc.CompactBlock)
 	errChan := make(chan error)
 
+	s.log.WithFields(logrus.Fields{
+		"method": "GetBlockRange",
+		"start":  span.Start.Height,
+		"end":    span.End.Height,
+	}).Info("Service")
+
 	go common.GetBlockRange(s.client, s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
 
 	for {
@@ -169,7 +188,6 @@ func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 		}
 	}
 
-	return nil
 }
 
 func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {

@@ -196,7 +196,7 @@ func main() {
 	log.Info("Got sapling height ", saplingHeight, " chain ", chainName, " branchID ", branchID)
 
 	// Initialize the cache
-	cache := common.NewBlockCache(opts.cacheSize)
+	cache := common.NewBlockCache(opts.cacheSize, log)
 
 	stopChan := make(chan bool, 1)
 

@@ -8,6 +8,7 @@ import (
 	"github.com/adityapk00/lightwalletd/walletrpc"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type BlockCacheEntry struct {
@@ -23,15 +24,17 @@ type BlockCache struct {
 
 	m map[int]*BlockCacheEntry
 
+	log   *logrus.Entry
 	mutex sync.RWMutex
 }
 
-func NewBlockCache(maxEntries int) *BlockCache {
+func NewBlockCache(maxEntries int, log *logrus.Entry) *BlockCache {
 	return &BlockCache{
 		MaxEntries: maxEntries,
 		FirstBlock: -1,
 		LastBlock:  -1,
 		m:          make(map[int]*BlockCacheEntry),
+		log:        log,
 	}
 }
 
@@ -62,6 +65,11 @@ func (c *BlockCache) AddHistorical(height int, block *walletrpc.CompactBlock) (e
 		hash: block.GetHash(),
 	}
 	c.FirstBlock = height
+
+	c.log.WithFields(logrus.Fields{
+		"method": "CacheHistoricalBlock",
+		"block":  height,
+	}).Info("Cache")
 
 	return nil, false
 }
@@ -114,7 +122,11 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) (error, bool
 		c.FirstBlock = c.FirstBlock + 1
 	}
 
-	//println("Cache size is ", len(c.m))
+	c.log.WithFields(logrus.Fields{
+		"method": "CacheLatestBlock",
+		"block":  height,
+	}).Info("Cache")
+
 	return nil, false
 }
 

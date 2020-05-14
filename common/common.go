@@ -101,12 +101,19 @@ func HistoricalBlockIngestor(rpcClient *rpcclient.Client, cache *BlockCache, log
 	// Wait for at least some blocks in the cache
 	for {
 		if cache.FirstBlock == -1 {
-			println("Historical block ingestor sleeping for 15s")
-			time.Sleep(15 * time.Second)
+			println("Historical block ingestor sleeping for 2s")
+			time.Sleep(2 * time.Second)
 		} else {
 			break
 		}
 	}
+
+	log.WithFields(logrus.Fields{
+		"method":     "CacheHistoricalBlock",
+		"op":         "Starting",
+		"startBlock": startBlock,
+		"endBlock":   (startBlock - totalBlocks),
+	}).Info("Cache")
 
 	// We don't have to worry about reorgs, becaue we'll be at least 100 blocks in the history, where there are no reorgs
 	for height := startBlock; height > (startBlock-totalBlocks) && height > saplingHeight; height-- {
@@ -122,11 +129,12 @@ func HistoricalBlockIngestor(rpcClient *rpcclient.Client, cache *BlockCache, log
 		}
 
 		if block != nil {
-			log.Info("Historical Ingestor adding block to cache: ", height)
-
 			err, full := cache.AddHistorical(height, block)
 			if full {
-				log.Info("Historical Ingestor stopping since cache is full")
+				log.WithFields(logrus.Fields{
+					"method": "CacheHistoricalBlock",
+					"op":     "Finished",
+				}).Info("Cache")
 				break
 			}
 
@@ -136,8 +144,6 @@ func HistoricalBlockIngestor(rpcClient *rpcclient.Client, cache *BlockCache, log
 			}
 		}
 	}
-
-	log.Info("Finished adding historical blocks")
 }
 
 func BlockIngestor(rpcClient *rpcclient.Client, cache *BlockCache, log *logrus.Entry,
@@ -152,7 +158,7 @@ func BlockIngestor(rpcClient *rpcclient.Client, cache *BlockCache, log *logrus.E
 		case <-stopChan:
 			break
 
-		case <-time.After(15 * time.Second):
+		case <-time.After(5 * time.Second):
 			for {
 				if reorgCount > 0 {
 					height -= 10
@@ -225,6 +231,12 @@ func GetBlock(rpcClient *rpcclient.Client, cache *BlockCache, height int) (*wall
 
 	// If a block was not found, make sure user is requesting a historical block
 	if height > cache.GetLatestBlock() {
+		cache.log.WithFields(logrus.Fields{
+			"error":       "BlockOutOfRange",
+			"height":      height,
+			"latestblock": cache.GetLatestBlock(),
+		}).Info("Cache")
+
 		return nil, errors.New(
 			fmt.Sprintf(
 				"Block requested is newer than latest block. Requested: %d Latest: %d",
@@ -236,6 +248,10 @@ func GetBlock(rpcClient *rpcclient.Client, cache *BlockCache, height int) (*wall
 		return nil, err
 	}
 
+	cache.log.WithFields(logrus.Fields{
+		"method": "CacheMiss",
+		"height": height,
+	}).Info("Cache")
 	return block, nil
 }
 

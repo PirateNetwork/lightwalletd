@@ -3,3 +3,4 @@ grpcfrontend
 cert.pem
 key.pem
 .vscode
+lightwalletd.log
