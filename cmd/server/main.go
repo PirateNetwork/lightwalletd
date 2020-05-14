@@ -259,7 +259,7 @@ func main() {
 
 	// Start the download params handler
 	log.Infof("Starting params handler")
-	go common.ParamsDownloadHandler(metrics)
+	go common.ParamsDownloadHandler(metrics, log)
 
 	log.Infof("Starting gRPC server on %s", opts.bindAddr)
 
