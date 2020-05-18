@@ -5,13 +5,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/peer"
 
 	"github.com/adityapk00/lightwalletd/common"
 	"github.com/adityapk00/lightwalletd/walletrpc"
@@ -21,16 +25,24 @@ var (
 	ErrUnspecified = errors.New("request for unspecified identifier")
 )
 
+type latencyCacheEntry struct {
+	timeNanos   int64
+	lastBlock   uint64
+	totalBlocks uint64
+}
+
 // the service type
 type SqlStreamer struct {
-	cache   *common.BlockCache
-	client  *rpcclient.Client
-	log     *logrus.Entry
-	metrics *common.PrometheusMetrics
+	cache        *common.BlockCache
+	client       *rpcclient.Client
+	log          *logrus.Entry
+	metrics      *common.PrometheusMetrics
+	latencyCache map[string]*latencyCacheEntry
+	latencyMutex sync.RWMutex
 }
 
 func NewSQLiteStreamer(client *rpcclient.Client, cache *common.BlockCache, log *logrus.Entry, metrics *common.PrometheusMetrics) (walletrpc.CompactTxStreamerServer, error) {
-	return &SqlStreamer{cache, client, log, metrics}, nil
+	return &SqlStreamer{cache, client, log, metrics, make(map[string]*latencyCacheEntry), sync.RWMutex{}}, nil
 }
 
 func (s *SqlStreamer) GracefulStop() error {
@@ -165,10 +177,67 @@ func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 	blockChan := make(chan walletrpc.CompactBlock)
 	errChan := make(chan error)
 
+	var peerip string
+
+	if peerInfo, ok := peer.FromContext(resp.Context()); ok {
+		ip, _, err := net.SplitHostPort(peerInfo.Addr.String())
+		if err == nil {
+			peerip = ip
+		} else {
+			peerip = "unknown"
+		}
+	} else {
+		peerip = "unknown"
+	}
+
+	go func() {
+		// If there is no ip, ignore
+		if peerip == "unknown" {
+			return
+		}
+
+		// Log only if bulk requesting blocks
+		if span.End.Height-span.Start.Height < 100 {
+			return
+		}
+
+		now := time.Now().UnixNano()
+		s.latencyMutex.Lock()
+		defer s.latencyMutex.Unlock()
+
+		// remove all old entries
+		for ip, entry := range s.latencyCache {
+			if entry.timeNanos+int64(30*math.Pow10(9)) < now { // delete after 30 seconds
+				delete(s.latencyCache, ip)
+			}
+		}
+
+		// Look up if this ip address has a previous getblock range
+		if entry, ok := s.latencyCache[peerip]; ok {
+			// Log only continous blocks
+			if entry.lastBlock+1 == span.Start.Height {
+				s.log.WithFields(logrus.Fields{
+					"method":         "GetBlockRangeLatency",
+					"peer_addr":      peerip,
+					"num_blocks":     entry.totalBlocks,
+					"latency_millis": (now - entry.timeNanos) / int64(math.Pow10(6)),
+				}).Info("Service")
+			}
+		}
+
+		// Add or update the ip entry
+		s.latencyCache[peerip] = &latencyCacheEntry{
+			lastBlock:   span.End.Height,
+			totalBlocks: span.End.Height - span.Start.Height + 1,
+			timeNanos:   now,
+		}
+	}()
+
 	s.log.WithFields(logrus.Fields{
-		"method": "GetBlockRange",
-		"start":  span.Start.Height,
-		"end":    span.End.Height,
+		"method":    "GetBlockRange",
+		"start":     span.Start.Height,
+		"end":       span.End.Height,
+		"peer_addr": peerip,
 	}).Info("Service")
 
 	go common.GetBlockRange(s.client, s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))

@@ -35,6 +35,7 @@ func NewBlockCache(maxEntries int, log *logrus.Entry) *BlockCache {
 		LastBlock:  -1,
 		m:          make(map[int]*BlockCacheEntry),
 		log:        log,
+		mutex:      sync.RWMutex{},
 	}
 }
 
