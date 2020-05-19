@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -100,6 +101,8 @@ type Options struct {
 	logPath       string `json:"log_file,omitempty"`
 	zcashConfPath string `json:"zcash_conf,omitempty"`
 	cacheSize     int    `json:"cache_size,omitempty"`
+	noParams      bool   `json:"no_params,omitempty"`
+	metricsPort   uint   `json:"metrics_port,omitempty"`
 }
 
 func main() {
@@ -112,6 +115,8 @@ func main() {
 	flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
 	flag.StringVar(&opts.zcashConfPath, "conf-file", "", "conf file to pull RPC creds from")
 	flag.IntVar(&opts.cacheSize, "cache-size", 40000, "number of blocks to hold in the cache")
+	flag.BoolVar(&opts.noParams, "no-params", false, "disable the params server")
+	flag.UintVar(&opts.metricsPort, "metrics-port", 2234, "the port on which to run the prometheus metrics exported")
 
 	// TODO prod metrics
 	// TODO support config from file and env vars
@@ -213,27 +218,6 @@ func main() {
 	// Add historical blocks also
 	go common.HistoricalBlockIngestor(rpcClient, cache, log, cacheStart-1, opts.cacheSize, saplingHeight)
 
-	// Compact transaction service initialization
-	service, err := frontend.NewSQLiteStreamer(rpcClient, cache, log, metrics)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"error": err,
-		}).Fatal("couldn't create SQL backend")
-	}
-	defer service.(*frontend.SqlStreamer).GracefulStop()
-
-	// Register service
-	walletrpc.RegisterCompactTxStreamerServer(server, service)
-
-	// Start listening
-	listener, err := net.Listen("tcp", opts.bindAddr)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"bind_addr": opts.bindAddr,
-			"error":     err,
-		}).Fatal("couldn't create listener")
-	}
-
 	// Signal handler for graceful stops
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
@@ -254,14 +238,40 @@ func main() {
 			promRegistry,
 			promhttp.HandlerOpts{},
 		))
-		log.Fatal(http.ListenAndServe(":2234", nil))
+		metricsport := fmt.Sprintf(":%d", opts.metricsPort)
+		log.Fatal(http.ListenAndServe(metricsport, nil))
 	}()
 
 	// Start the download params handler
-	log.Infof("Starting params handler")
-	go common.ParamsDownloadHandler(metrics, log)
+	if !opts.noParams {
+		log.Infof("Starting params handler")
+		go common.ParamsDownloadHandler(metrics, log)
 
-	log.Infof("Starting gRPC server on %s", opts.bindAddr)
+		log.Infof("Starting gRPC server on %s", opts.bindAddr)
+	}
+
+	// Start the GRPC server
+
+	// Compact transaction service initialization
+	service, err := frontend.NewSQLiteStreamer(rpcClient, cache, log, metrics)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"error": err,
+		}).Fatal("couldn't create SQL backend")
+	}
+	defer service.(*frontend.SqlStreamer).GracefulStop()
+
+	// Register service
+	walletrpc.RegisterCompactTxStreamerServer(server, service)
+
+	// Start listening
+	listener, err := net.Listen("tcp", opts.bindAddr)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"bind_addr": opts.bindAddr,
+			"error":     err,
+		}).Fatal("couldn't create listener")
+	}
 
 	err = server.Serve(listener)
 	if err != nil {
