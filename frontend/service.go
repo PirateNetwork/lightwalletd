@@ -143,6 +143,33 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 	return nil
 }
 
+func (s *SqlStreamer) peerIPFromContext(ctx context.Context) string {
+	var peerip string
+
+	if peerInfo, ok := peer.FromContext(ctx); ok {
+		ip, _, err := net.SplitHostPort(peerInfo.Addr.String())
+		if err == nil {
+			peerip = ip
+		} else {
+			peerip = "unknown"
+		}
+	} else {
+		peerip = "unknown"
+	}
+
+	return peerip
+}
+
+func (s *SqlStreamer) dailyActiveBlock(height uint64, peerip string) {
+	if height%1152 == 0 {
+		s.log.WithFields(logrus.Fields{
+			"method":       "DailyActiveBlock",
+			"peer_addr":    peerip,
+			"block_height": height,
+		}).Info("Service")
+	}
+}
+
 func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
 	if id.Height == 0 && id.Hash == nil {
 		return nil, ErrUnspecified
@@ -153,6 +180,11 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 		"start":  id.Height,
 		"end":    id.Height,
 	}).Info("Service")
+
+	// Log a daily active user if the user requests the day's "key block"
+	go func() {
+		s.dailyActiveBlock(id.Height, s.peerIPFromContext(ctx))
+	}()
 
 	// Precedence: a hash is more specific than a height. If we have it, use it first.
 	if id.Hash != nil {
@@ -177,19 +209,9 @@ func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 	blockChan := make(chan walletrpc.CompactBlock)
 	errChan := make(chan error)
 
-	var peerip string
+	peerip := s.peerIPFromContext(resp.Context())
 
-	if peerInfo, ok := peer.FromContext(resp.Context()); ok {
-		ip, _, err := net.SplitHostPort(peerInfo.Addr.String())
-		if err == nil {
-			peerip = ip
-		} else {
-			peerip = "unknown"
-		}
-	} else {
-		peerip = "unknown"
-	}
-
+	// Latency logging
 	go func() {
 		// If there is no ip, ignore
 		if peerip == "unknown" {
@@ -230,6 +252,13 @@ func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 			lastBlock:   span.End.Height,
 			totalBlocks: span.End.Height - span.Start.Height + 1,
 			timeNanos:   now,
+		}
+	}()
+
+	// Log a daily active user if the user requests the day's "key block"
+	go func() {
+		for height := span.Start.Height; height <= span.End.Height; height++ {
+			s.dailyActiveBlock(height, peerip)
 		}
 	}()
 
