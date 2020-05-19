@@ -242,6 +242,7 @@ func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 					"method":         "GetBlockRangeLatency",
 					"peer_addr":      peerip,
 					"num_blocks":     entry.totalBlocks,
+					"end_height":     entry.lastBlock,
 					"latency_millis": (now - entry.timeNanos) / int64(math.Pow10(6)),
 				}).Info("Service")
 			}
