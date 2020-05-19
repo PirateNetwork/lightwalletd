@@ -1,5 +1,5 @@
 main
-grpcfrontend
+grpcfrontend*
 cert.pem
 key.pem
 .vscode
