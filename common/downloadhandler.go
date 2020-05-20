@@ -50,11 +50,11 @@ func paramsHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 // ParamsDownloadHandler Listens on port 8090 for download requests for params
-func ParamsDownloadHandler(prommetrics *PrometheusMetrics, logger *logrus.Entry) {
+func ParamsDownloadHandler(prommetrics *PrometheusMetrics, logger *logrus.Entry, port string) {
 	metrics = prommetrics
 	log = logger
 
 	http.HandleFunc("/params/", paramsHandler)
 
-	http.ListenAndServe(":8090", nil)
+	http.ListenAndServe(port, nil)
 }

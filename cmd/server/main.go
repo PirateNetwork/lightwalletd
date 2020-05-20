@@ -101,16 +101,16 @@ func loggerFromContext(ctx context.Context) *logrus.Entry {
 }
 
 type Options struct {
-	bindAddr      string `json:"bind_address,omitempty"`
-	tlsCertPath   string `json:"tls_cert_path,omitempty"`
-	tlsKeyPath    string `json:"tls_cert_key,omitempty"`
-	noTLS         bool   `json:no_tls,omitempty`
-	logLevel      uint64 `json:"log_level,omitempty"`
-	logPath       string `json:"log_file,omitempty"`
-	zcashConfPath string `json:"zcash_conf,omitempty"`
-	cacheSize     int    `json:"cache_size,omitempty"`
-	noParams      bool   `json:"no_params,omitempty"`
-	metricsPort   uint   `json:"metrics_port,omitempty"`
+	bindAddr      string
+	tlsCertPath   string
+	tlsKeyPath    string
+	noTLS         bool
+	logLevel      uint64
+	logPath       string
+	zcashConfPath string
+	cacheSize     int
+	metricsPort   uint
+	paramsPort    uint
 }
 
 func main() {
@@ -123,7 +123,7 @@ func main() {
 	flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
 	flag.StringVar(&opts.zcashConfPath, "conf-file", "", "conf file to pull RPC creds from")
 	flag.IntVar(&opts.cacheSize, "cache-size", 40000, "number of blocks to hold in the cache")
-	flag.BoolVar(&opts.noParams, "no-params", false, "disable the params server")
+	flag.UintVar(&opts.paramsPort, "params-port", 8090, "the port on which the params server listens")
 	flag.UintVar(&opts.metricsPort, "metrics-port", 2234, "the port on which to run the prometheus metrics exported")
 
 	// TODO prod metrics
@@ -251,14 +251,12 @@ func main() {
 	}()
 
 	// Start the download params handler
-	if !opts.noParams {
-		log.Infof("Starting params handler")
-		go common.ParamsDownloadHandler(metrics, log)
-
-		log.Infof("Starting gRPC server on %s", opts.bindAddr)
-	}
+	log.Infof("Starting params handler")
+	paramsport := fmt.Sprintf(":%d", opts.paramsPort)
+	go common.ParamsDownloadHandler(metrics, log, paramsport)
 
 	// Start the GRPC server
+	log.Infof("Starting gRPC server on %s", opts.bindAddr)
 
 	// Compact transaction service initialization
 	service, err := frontend.NewSQLiteStreamer(rpcClient, cache, log, metrics)
