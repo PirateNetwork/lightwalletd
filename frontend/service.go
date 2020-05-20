@@ -15,6 +15,7 @@ import (
 
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 
 	"github.com/adityapk00/lightwalletd/common"
@@ -144,20 +145,21 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 }
 
 func (s *SqlStreamer) peerIPFromContext(ctx context.Context) string {
-	var peerip string
+	if xRealIP, ok := metadata.FromIncomingContext(ctx); ok {
+		realIP := xRealIP.Get("x-real-ip")
+		if len(realIP) > 0 {
+			return realIP[0]
+		}
+	}
 
 	if peerInfo, ok := peer.FromContext(ctx); ok {
 		ip, _, err := net.SplitHostPort(peerInfo.Addr.String())
 		if err == nil {
-			peerip = ip
-		} else {
-			peerip = "unknown"
+			return ip
 		}
-	} else {
-		peerip = "unknown"
 	}
 
-	return peerip
+	return "unknown"
 }
 
 func (s *SqlStreamer) dailyActiveBlock(height uint64, peerip string) {

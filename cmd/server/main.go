@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
 
@@ -85,10 +86,17 @@ func logInterceptor(
 }
 
 func loggerFromContext(ctx context.Context) *logrus.Entry {
-	// TODO: anonymize the addresses. cryptopan?
+	if xRealIP, ok := metadata.FromIncomingContext(ctx); ok {
+		realIP := xRealIP.Get("x-real-ip")
+		if len(realIP) > 0 {
+			return log.WithFields(logrus.Fields{"peer_addr": realIP[0]})
+		}
+	}
+
 	if peerInfo, ok := peer.FromContext(ctx); ok {
 		return log.WithFields(logrus.Fields{"peer_addr": peerInfo.Addr})
 	}
+
 	return log.WithFields(logrus.Fields{"peer_addr": "unknown"})
 }
 
