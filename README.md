@@ -30,17 +30,11 @@ txindex=1
 insightexplorer=1
 ```
 
-You might need to run with `-reindex` the first time if you are enabling the `txindex` or `insightexplorer` options for the first time. The reindex might take a while.
+You might need to run with `-reindex` the first time if you are enabling the `txindex` or `insightexplorer` options for the first time. The reindex might take a while. If you are using it on testnet, please also include `testnet=1`
 
 #### 2. Get a TLS certificate
-##### a. Self-signed certificate if you are running a private instance just for yourself:
 
-Generate a TLS self-signed certificate
-```
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
-```
-Answer the certificate questions to generate the self-signed certificate
-##### b. "Let's Encrypt" certificate using NGINX as a reverse proxy
+##### a. "Let's Encrypt" certificate using NGINX as a reverse proxy
 If you running a public-facing server, the easiest way to obtain a certificate is to use a NGINX reverse proxy and get a Let's Encrypt certificate. [Instructions are here](https://www.nginx.com/blog/using-free-ssltls-certificates-from-lets-encrypt-with-nginx/)
 
 Create a new section for the NGINX reverse proxy:
@@ -59,8 +53,8 @@ server {
 }
 ```
 
-##### c. Use your own TLS certificate
-If you have your own TLS certificate issued by a certificate authority, you can use it directly with the GRPC frontend, as described in the next section
+##### b. Use without TLS certificate
+You can run lightwalletd without TLS and server traffic over `http`. This is recommended only for local testing
 
 #### 3. Run the frontend:
 You can run the gRPC server with or without TLS, depending on how you configured step 2. If you are using NGINX as a reverse proxy and are letting NGINX handle the TLS authentication, then run the frontend with `-no-tls`
@@ -80,11 +74,11 @@ You should start seeing the frontend ingest and cache the zcash blocks after ~15
 #### 4. Point the `zecwallet-cli` to this server
 Connect to your server!
 ```
-./zecwallet-cli -server https://mylightwalletd.server.com
+./zecwallet-cli -server https://mylightwalletd.server.com:443
 ```
 
-If you are using a self-signed certificate, then zecwallet will reject the connection by default (because the certificate isn't from a valid certificate authority. To override this, pass the `--dangerous` flag. Obviously, this is dangerous, so please only use if you are connecting to **your own** server.
+If you are using your own server running without TLS, you can also connect over `http`
 
 ```
-./zecwallet-cli --server https://127.0.0.1:9067 --dangerous
+./zecwallet-cli --server http://127.0.0.1:9067
 ```
