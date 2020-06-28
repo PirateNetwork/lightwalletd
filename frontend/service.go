@@ -56,7 +56,6 @@ func (s *SqlStreamer) GetCache() *common.BlockCache {
 
 func (s *SqlStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
 	latestBlock := s.cache.GetLatestBlock()
-	time.Sleep(200 * time.Millisecond)
 
 	if latestBlock == -1 {
 		s.metrics.TotalErrors.Inc()
@@ -74,7 +73,10 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 	var err error
 	var errCode int64
 
-	time.Sleep(200 * time.Millisecond)
+	if addressBlockFilter == nil || addressBlockFilter.Range == nil || addressBlockFilter.Range.Start == nil || addressBlockFilter.Range.End == nil {
+		s.log.Errorf("Bad Structure")
+		return nil
+	}
 
 	// Test to make sure Address is a single t address
 	match, err := regexp.Match("^t[a-zA-Z0-9]{34}$", []byte(addressBlockFilter.Address))
@@ -178,7 +180,6 @@ func (s *SqlStreamer) dailyActiveBlock(height uint64, peerip string) {
 }
 
 func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
-	time.Sleep(200 * time.Millisecond)
 
 	if id.Height == 0 && id.Hash == nil {
 		return nil, ErrUnspecified
@@ -215,7 +216,6 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 }
 
 func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
-	time.Sleep(200 * time.Millisecond)
 
 	blockChan := make(chan walletrpc.CompactBlock)
 	errChan := make(chan error)
@@ -301,7 +301,6 @@ func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 }
 
 func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
-	time.Sleep(200 * time.Millisecond)
 
 	var txBytes []byte
 	var txHeight float64
@@ -366,12 +365,23 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 			}
 			return nil, err
 		}
+
 		var txinfo interface{}
 		err = json.Unmarshal(result, &txinfo)
 		if err != nil {
 			return nil, err
 		}
 		txHeight = txinfo.(map[string]interface{})["height"].(float64)
+
+		go func() {
+			peerip := s.peerIPFromContext(ctx)
+
+			s.log.WithFields(logrus.Fields{
+				"method":    "GetTransaction",
+				"hash":      leHashString,
+				"peer_addr": peerip,
+			}).Info("Service")
+		}()
 
 		return &walletrpc.RawTransaction{Data: txBytes, Height: uint64(txHeight)}, nil
 	}
@@ -388,7 +398,6 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 
 // GetLightdInfo gets the LightWalletD (this server) info
 func (s *SqlStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
-	time.Sleep(200 * time.Millisecond)
 
 	saplingHeight, blockHeight, chainName, consensusBranchId, err := common.GetSaplingInfo(s.client)
 
