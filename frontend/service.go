@@ -75,7 +75,7 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 
 	if addressBlockFilter == nil || addressBlockFilter.Range == nil || addressBlockFilter.Range.Start == nil || addressBlockFilter.Range.End == nil {
 		s.log.Errorf("Bad Structure")
-		return nil
+		return ErrUnspecified
 	}
 
 	// Test to make sure Address is a single t address
@@ -84,7 +84,7 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 		s.metrics.TotalErrors.Inc()
 
 		s.log.Errorf("Unrecognized address: %s", addressBlockFilter.Address)
-		return nil
+		return errors.New("Unrecognized Address")
 	}
 
 	params := make([]json.RawMessage, 1)
@@ -105,16 +105,16 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 		errCode, err = strconv.ParseInt(errParts[0], 10, 32)
 		//Check to see if we are requesting a height the zcashd doesn't have yet
 		if err == nil && errCode == -8 {
-			return nil
+			return ErrUnspecified
 		}
-		return nil
+		return rpcErr
 	}
 
 	var txids []string
 	err = json.Unmarshal(result, &txids)
 	if err != nil {
 		s.log.Errorf("Got error: %s", err.Error())
-		return nil
+		return err
 	}
 
 	timeout, cancel := context.WithTimeout(resp.Context(), 30*time.Second)
@@ -133,7 +133,7 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 			s.metrics.TotalErrors.Inc()
 
 			s.log.Errorf("Got error: %s", err.Error())
-			return nil
+			return err
 		}
 
 		resp.Send(tx)
@@ -181,7 +181,7 @@ func (s *SqlStreamer) dailyActiveBlock(height uint64, peerip string) {
 
 func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
 
-	if id.Height == 0 && id.Hash == nil {
+	if id == nil || (id.Height == 0 && id.Hash == nil) {
 		return nil, ErrUnspecified
 	}
 
@@ -216,6 +216,9 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 }
 
 func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
+	if span == nil || span.Start == nil || span.End == nil {
+		return ErrUnspecified
+	}
 
 	blockChan := make(chan walletrpc.CompactBlock)
 	errChan := make(chan error)
@@ -304,6 +307,10 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 
 	var txBytes []byte
 	var txHeight float64
+
+	if txf == nil {
+		return nil, ErrUnspecified
+	}
 
 	if txf.Hash != nil {
 		txid := txf.Hash
@@ -437,6 +444,10 @@ func (s *SqlStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	//
 	// Result:
 	// "hex"             (string) The transaction hash in hex
+
+	if rawtx == nil || rawtx.Data == nil {
+		return nil, ErrUnspecified
+	}
 
 	// Construct raw JSON-RPC params
 	params := make([]json.RawMessage, 1)
