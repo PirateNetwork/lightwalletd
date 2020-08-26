@@ -1,4 +1,5 @@
 // Copyright (c) 2019-2020 The Zcash developers
+// Copyright (c) 2019-2021 Pirate Chain developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
@@ -21,9 +22,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/adityapk00/lightwalletd/common"
-	"github.com/adityapk00/lightwalletd/parser"
-	"github.com/adityapk00/lightwalletd/walletrpc"
+	"github.com/PirateNetwork/lightwalletd/common"
+	"github.com/PirateNetwork/lightwalletd/parser"
+	"github.com/PirateNetwork/lightwalletd/walletrpc"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
@@ -97,13 +98,13 @@ func (s *lwdStreamer) dailyActiveBlock(height uint64, peerip string) {
 	}
 }
 
-// GetLatestBlock returns the height of the best chain, according to zcashd.
+// GetLatestBlock returns the height of the best chain, according to pirated.
 func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
 	result, rpcErr := common.RawRequest("getblockchaininfo", []json.RawMessage{})
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
-	var getblockchaininfoReply common.ZcashdRpcReplyGetblockchaininfo
+	var getblockchaininfoReply common.PiratedRpcReplyGetblockchaininfo
 	err := json.Unmarshal(result, &getblockchaininfoReply)
 	if err != nil {
 		return nil, rpcErr
@@ -132,7 +133,7 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 		return errors.New("Must specify an end block height")
 	}
 	params := make([]json.RawMessage, 1)
-	request := &common.ZcashdRpcRequestGetaddresstxids{
+	request := &common.PiratedRpcRequestGetaddresstxids{
 		Addresses: []string{addressBlockFilter.Address},
 		Start:     addressBlockFilter.Range.Start.Height,
 		End:       addressBlockFilter.Range.End.Height,
@@ -309,7 +310,7 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		}
 		params[0] = hashJSON
 	}
-	var gettreestateReply common.ZcashdRpcReplyGettreestate
+	var gettreestateReply common.PiratedRpcReplyGettreestate
 	for {
 		result, rpcErr := common.RawRequest("z_gettreestate", params)
 		if rpcErr != nil {
@@ -332,7 +333,7 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		params[0] = hashJSON
 	}
 	if gettreestateReply.Sapling.Commitments.FinalState == "" {
-		return nil, errors.New("zcashd did not return treestate")
+		return nil, errors.New("pirated did not return treestate")
 	}
 	return &walletrpc.TreeState{
 		Network: s.chainName,
@@ -344,7 +345,7 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 }
 
 // GetTransaction returns the raw transaction bytes that are returned
-// by the zcashd 'getrawtransaction' RPC.
+// by the pirated 'getrawtransaction' RPC.
 func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
 	if txf.Hash != nil {
 		if len(txf.Hash) != 32 {
@@ -365,7 +366,7 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 			return nil, rpcErr
 		}
 		// Many other fields are returned, but we need only these two.
-		var txinfo common.ZcashdRpcReplyGetrawtransaction
+		var txinfo common.PiratedRpcReplyGetrawtransaction
 		err = json.Unmarshal(result, &txinfo)
 		if err != nil {
 			return nil, err
@@ -387,12 +388,12 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 }
 
 // GetLightdInfo gets the LightWalletD (this server) info, and includes information
-// it gets from its backend zcashd.
+// it gets from its backend pirated.
 func (s *lwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
 	return common.GetLightdInfo()
 }
 
-// SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
+// SendTransaction forwards raw transaction bytes to a pirated instance over JSON-RPC
 func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
 	// sendrawtransaction "hexstring" ( allowhighfees )
 	//
@@ -446,14 +447,14 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	return resp, nil
 }
 
-func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, error) {
+func getTaddressBalancePiratedRpc(addressList []string) (*walletrpc.Balance, error) {
 	for _, addr := range addressList {
 		if err := checkTaddress(addr); err != nil {
 			return &walletrpc.Balance{}, err
 		}
 	}
 	params := make([]json.RawMessage, 1)
-	addrList := &common.ZcashdRpcRequestGetaddressbalance{
+	addrList := &common.PiratedRpcRequestGetaddressbalance{
 		Addresses: addressList,
 	}
 	param, err := json.Marshal(addrList)
@@ -466,7 +467,7 @@ func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, erro
 	if rpcErr != nil {
 		return &walletrpc.Balance{}, rpcErr
 	}
-	var balanceReply common.ZcashdRpcReplyGetaddressbalance
+	var balanceReply common.PiratedRpcReplyGetaddressbalance
 	err = json.Unmarshal(result, &balanceReply)
 	if err != nil {
 		return &walletrpc.Balance{}, err
@@ -476,7 +477,7 @@ func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, erro
 
 // GetTaddressBalance returns the total balance for a list of taddrs
 func (s *lwdStreamer) GetTaddressBalance(ctx context.Context, addresses *walletrpc.AddressList) (*walletrpc.Balance, error) {
-	return getTaddressBalanceZcashdRpc(addresses.Addresses)
+	return getTaddressBalancePiratedRpc(addresses.Addresses)
 }
 
 // GetTaddressBalanceStream returns the total balance for a list of taddrs
@@ -492,7 +493,7 @@ func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStre
 		}
 		addressList = append(addressList, addr.Address)
 	}
-	balance, err := getTaddressBalanceZcashdRpc(addressList)
+	balance, err := getTaddressBalancePiratedRpc(addressList)
 	if err != nil {
 		return err
 	}
@@ -504,7 +505,7 @@ func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStre
 var mempoolMap *map[string]*walletrpc.CompactTx
 var mempoolList []string
 
-// Last time we pulled a copy of the mempool from zcashd.
+// Last time we pulled a copy of the mempool from pirated.
 var lastMempool time.Time
 
 func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.CompactTxStreamer_GetMempoolTxServer) error {
@@ -635,7 +636,7 @@ func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAdd
 		}
 	}
 	params := make([]json.RawMessage, 1)
-	addrList := &common.ZcashdRpcRequestGetaddressutxos{
+	addrList := &common.PiratedRpcRequestGetaddressutxos{
 		Addresses: arg.Addresses,
 	}
 	param, err := json.Marshal(addrList)
@@ -647,7 +648,7 @@ func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAdd
 	if rpcErr != nil {
 		return rpcErr
 	}
-	var utxosReply common.ZcashdRpcReplyGetaddressutxos
+	var utxosReply common.PiratedRpcReplyGetaddressutxos
 	err = json.Unmarshal(result, &utxosReply)
 	if err != nil {
 		return err
@@ -744,7 +745,7 @@ func (s *DarksideStreamer) Reset(ctx context.Context, ms *walletrpc.DarksideMeta
 }
 
 // StageBlocksStream accepts a list of blocks from the wallet test code,
-// and makes them available to present from the mock zcashd's GetBlock rpc.
+// and makes them available to present from the mock pirated's GetBlock rpc.
 func (s *DarksideStreamer) StageBlocksStream(blocks walletrpc.DarksideStreamer_StageBlocksStreamServer) error {
 	for {
 		b, err := blocks.Recv()

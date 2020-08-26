@@ -1,4 +1,5 @@
 // Copyright (c) 2019-2020 The Zcash developers
+// Copyright (c) 2019-2021 Pirate Chain developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 package logging
@@ -11,7 +12,7 @@ import (
 
 	"errors"
 
-	"github.com/adityapk00/lightwalletd/common"
+	"github.com/PirateNetwork/lightwalletd/common"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"

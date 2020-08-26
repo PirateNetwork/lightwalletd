@@ -1,4 +1,5 @@
 // Copyright (c) 2019-2020 The Zcash developers
+// Copyright (c) 2019-2021 Pirate Chain developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
@@ -11,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adityapk00/lightwalletd/parser"
-	"github.com/adityapk00/lightwalletd/walletrpc"
+	"github.com/PirateNetwork/lightwalletd/parser"
+	"github.com/PirateNetwork/lightwalletd/walletrpc"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -34,7 +35,7 @@ type Options struct {
 	TLSKeyPath          string `json:"tls_cert_key,omitempty"`
 	LogLevel            uint64 `json:"log_level,omitempty"`
 	LogFile             string `json:"log_file,omitempty"`
-	ZcashConfPath       string `json:"zcash_conf,omitempty"`
+	PirateConfPath      string `json:"pirate_conf,omitempty"`
 	RPCUser             string `json:"rpcuser"`
 	RPCPassword         string `json:"rpcpassword"`
 	RPCHost             string `json:"rpchost"`
@@ -48,9 +49,9 @@ type Options struct {
 	DarksideTimeout     uint64 `json:"darkside_timeout"`
 }
 
-// RawRequest points to the function to send a an RPC request to zcashd;
+// RawRequest points to the function to send a an RPC request to pirated;
 // in production, it points to btcsuite/btcd/rpcclient/rawrequest.go:RawRequest();
-// in unit tests it points to a function to mock RPCs to zcashd.
+// in unit tests it points to a function to mock RPCs to pirated.
 var RawRequest func(method string, params []json.RawMessage) (json.RawMessage, error)
 
 // Sleep allows a request to time.Sleep() to be mocked for testing;
@@ -64,9 +65,9 @@ var Log *logrus.Entry
 // Metrics as a global object to simplify things
 var Metrics *PrometheusMetrics
 
-// The following are JSON zcashd rpc requests and replies.
+// The following are JSON pirated rpc requests and replies.
 type (
-	// zcashd rpc "getblockchaininfo"
+	// pirated rpc "getblockchaininfo"
 	Upgradeinfo struct {
 		// unneeded fields can be omitted
 		ActivationHeight int
@@ -76,7 +77,7 @@ type (
 		Nextblock string // example: "e9ff75a6" (canopy)
 		Chaintip  string // example: "e9ff75a6" (canopy)
 	}
-	ZcashdRpcReplyGetblockchaininfo struct {
+	PiratedRpcReplyGetblockchaininfo struct {
 		Chain           string
 		Upgrades        map[string]Upgradeinfo
 		Blocks          int
@@ -84,21 +85,21 @@ type (
 		EstimatedHeight int
 	}
 
-	// zcashd rpc "getinfo"
-	ZcashdRpcReplyGetinfo struct {
+	// pirated rpc "getinfo"
+	PiratedRpcReplyGetinfo struct {
 		Build      string
 		Subversion string
 	}
 
-	// zcashd rpc "getaddresstxids"
-	ZcashdRpcRequestGetaddresstxids struct {
+	// pirated rpc "getaddresstxids"
+	PiratedRpcRequestGetaddresstxids struct {
 		Addresses []string `json:"addresses"`
 		Start     uint64   `json:"start"`
 		End       uint64   `json:"end"`
 	}
 
-	// zcashd rpc "z_gettreestate"
-	ZcashdRpcReplyGettreestate struct {
+	// pirated rpc "z_gettreestate"
+	PiratedRpcReplyGettreestate struct {
 		Height  int
 		Hash    string
 		Time    uint32
@@ -110,25 +111,25 @@ type (
 		}
 	}
 
-	// zcashd rpc "getrawtransaction"
-	ZcashdRpcReplyGetrawtransaction struct {
+	// pirated rpc "getrawtransaction"
+	PiratedRpcReplyGetrawtransaction struct {
 		Hex    string
 		Height int
 	}
 
-	// zcashd rpc "getaddressbalance"
-	ZcashdRpcRequestGetaddressbalance struct {
+	// pirated rpc "getaddressbalance"
+	PiratedRpcRequestGetaddressbalance struct {
 		Addresses []string `json:"addresses"`
 	}
-	ZcashdRpcReplyGetaddressbalance struct {
+	PiratedRpcReplyGetaddressbalance struct {
 		Balance int64
 	}
 
-	// zcashd rpc "getaddressutxos"
-	ZcashdRpcRequestGetaddressutxos struct {
+	// pirated rpc "getaddressutxos"
+	PiratedRpcRequestGetaddressutxos struct {
 		Addresses []string `json:"addresses"`
 	}
-	ZcashdRpcReplyGetaddressutxos []struct {
+	PiratedRpcReplyGetaddressutxos []struct {
 		Address     string
 		Txid        string
 		OutputIndex int64
@@ -138,7 +139,7 @@ type (
 	}
 )
 
-// FirstRPC tests that we can successfully reach zcashd through the RPC
+// FirstRPC tests that we can successfully reach pirated through the RPC
 // interface. The specific RPC used here is not important.
 func FirstRPC() {
 	retryCount := 0
@@ -148,7 +149,7 @@ func FirstRPC() {
 			if retryCount > 0 {
 				Log.Warn("getblockchaininfo RPC successful")
 			}
-			var getblockchaininfo ZcashdRpcReplyGetblockchaininfo
+			var getblockchaininfo PiratedRpcReplyGetblockchaininfo
 			err := json.Unmarshal(result, &getblockchaininfo)
 			if err != nil {
 				Log.Fatalf("error parsing JSON getblockchaininfo response: %v", err)
@@ -174,7 +175,7 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
-	var getinfoReply ZcashdRpcReplyGetinfo
+	var getinfoReply PiratedRpcReplyGetinfo
 	err := json.Unmarshal(result, &getinfoReply)
 	if err != nil {
 		return nil, rpcErr
@@ -184,7 +185,7 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
-	var getblockchaininfoReply ZcashdRpcReplyGetblockchaininfo
+	var getblockchaininfoReply PiratedRpcReplyGetblockchaininfo
 	err = json.Unmarshal(result, &getblockchaininfoReply)
 	if err != nil {
 		return nil, rpcErr
@@ -195,14 +196,14 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 		saplingHeight = saplingJSON.ActivationHeight
 	}
 
-	vendor := "Zecwallet LightWalletD"
+	vendor := "Pirate LightWalletD"
 	if DarksideEnabled {
-		vendor = "Zecwallet DarksideWalletD"
+		vendor = "Pirate DarksideWalletD"
 	}
 	return &walletrpc.LightdInfo{
 		Version:                 Version,
 		Vendor:                  vendor,
-		TaddrSupport:            true,
+		TaddrSupport:            false,
 		ChainName:               getblockchaininfoReply.Chain,
 		SaplingActivationHeight: uint64(saplingHeight),
 		ConsensusBranchId:       getblockchaininfoReply.Consensus.Chaintip,
@@ -212,8 +213,8 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 		BuildDate:               BuildDate,
 		BuildUser:               BuildUser,
 		EstimatedHeight:         uint64(getblockchaininfoReply.EstimatedHeight),
-		ZcashdBuild:             getinfoReply.Build,
-		ZcashdSubversion:        getinfoReply.Subversion,
+		PiratedBuild:            getinfoReply.Build,
+		PiratedSubversion:       getinfoReply.Subversion,
 	}, nil
 }
 
@@ -229,7 +230,7 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 
 	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
-		// Check to see if we are requesting a height the zcashd doesn't have yet
+		// Check to see if we are requesting a height the pirated doesn't have yet
 		if (strings.Split(rpcErr.Error(), ":"))[0] == "-8" {
 			return nil, nil
 		}
@@ -281,7 +282,7 @@ func stopIngestor() {
 	}
 }
 
-// BlockIngestor runs as a goroutine and polls zcashd for new blocks, adding them
+// BlockIngestor runs as a goroutine and polls pirated for new blocks, adding them
 // to the cache. The repetition count, rep, is nonzero only for unit-testing.
 func BlockIngestor(c *BlockCache, rep int) {
 	lastLog := time.Now()
@@ -305,12 +306,12 @@ func BlockIngestor(c *BlockCache, rep int) {
 			Log.WithFields(logrus.Fields{
 				"height": height,
 				"error":  err,
-			}).Warn("error zcashd getblock rpc")
+			}).Warn("error pirated getblock rpc")
 			retryCount++
 			if retryCount > 10 {
 				Log.WithFields(logrus.Fields{
 					"timeouts": retryCount,
-				}).Fatal("unable to issue RPC call to zcashd node")
+				}).Fatal("unable to issue RPC call to pirated node")
 			}
 			// Delay then retry the same height.
 			c.Sync()
@@ -322,7 +323,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 		if block == nil {
 			// No block at this height.
 			if height == c.GetFirstHeight() {
-				Log.Info("Waiting for zcashd height to reach Sapling activation height ",
+				Log.Info("Waiting for pirated height to reach Sapling activation height ",
 					"(", c.GetFirstHeight(), ")...")
 				reorgCount = 0
 				Sleep(20 * time.Second)
@@ -385,7 +386,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 }
 
 // GetBlock returns the compact block at the requested height, first by querying
-// the cache, then, if not found, will request the block from zcashd. It returns
+// the cache, then, if not found, will request the block from pirated. It returns
 // nil if no block exists at this height.
 func GetBlock(cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
 	// First, check the cache to see if we have the block
@@ -394,7 +395,7 @@ func GetBlock(cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
 		return block, nil
 	}
 
-	// Not in the cache, ask zcashd
+	// Not in the cache, ask pirated
 	block, err := getBlockFromRPC(height)
 	if err != nil {
 		return nil, err

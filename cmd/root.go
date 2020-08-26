@@ -23,10 +23,10 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/adityapk00/lightwalletd/common"
-	"github.com/adityapk00/lightwalletd/common/logging"
-	"github.com/adityapk00/lightwalletd/frontend"
-	"github.com/adityapk00/lightwalletd/walletrpc"
+	"github.com/PirateNetwork/lightwalletd/common"
+	"github.com/PirateNetwork/lightwalletd/common/logging"
+	"github.com/PirateNetwork/lightwalletd/frontend"
+	"github.com/PirateNetwork/lightwalletd/walletrpc"
 )
 
 var (
@@ -39,9 +39,9 @@ var logger = logrus.New()
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "lightwalletd",
-	Short: "Lightwalletd is a backend service to the Zcash blockchain",
+	Short: "Lightwalletd is a backend service to the Pirate blockchain",
 	Long: `Lightwalletd is a backend service that provides a 
-         bandwidth-efficient interface to the Zcash blockchain`,
+         bandwidth-efficient interface to the Pirate blockchain`,
 	Run: func(cmd *cobra.Command, args []string) {
 		opts := &common.Options{
 			GRPCBindAddr:        viper.GetString("grpc-bind-addr"),
@@ -51,7 +51,7 @@ var rootCmd = &cobra.Command{
 			TLSKeyPath:          viper.GetString("tls-key"),
 			LogLevel:            viper.GetUint64("log-level"),
 			LogFile:             viper.GetString("log-file"),
-			ZcashConfPath:       viper.GetString("zcash-conf-path"),
+			PirateConfPath:      viper.GetString("pirate-conf-path"),
 			RPCUser:             viper.GetString("rpcuser"),
 			RPCPassword:         viper.GetString("rpcpassword"),
 			RPCHost:             viper.GetString("rpchost"),
@@ -189,7 +189,7 @@ func startServer(opts *common.Options) error {
 		reflection.Register(server)
 	}
 
-	// Initialize Zcash RPC client. Right now (Jan 2018) this is only for
+	// Initialize Pirate RPC client. Right now (Jan 2018) this is only for
 	// sending transactions, but in the future it could back a different type
 	// of block streamer.
 
@@ -208,19 +208,19 @@ func startServer(opts *common.Options) error {
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("setting up RPC connection to zcashd")
+			}).Fatal("setting up RPC connection to pirated")
 		}
 		// Indirect function for test mocking (so unit tests can talk to stub functions).
 		common.RawRequest = rpcClient.RawRequest
 
-		// Ensure that we can communicate with zcashd
+		// Ensure that we can communicate with pirated
 		common.FirstRPC()
 
 		getLightdInfo, err := common.GetLightdInfo()
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("getting initial information from zcashd")
+			}).Fatal("getting initial information from pirated")
 		}
 		common.Log.Info("Got sapling height ", getLightdInfo.SaplingActivationHeight,
 			" block height ", getLightdInfo.BlockHeight,
@@ -329,7 +329,7 @@ func init() {
 	rootCmd.Flags().String("tls-key", "./cert.key", "the path to a TLS key file")
 	rootCmd.Flags().Int("log-level", int(logrus.InfoLevel), "log level (logrus 1-7)")
 	rootCmd.Flags().String("log-file", "./server.log", "log file to write to")
-	rootCmd.Flags().String("zcash-conf-path", "./zcash.conf", "conf file to pull RPC creds from")
+	rootCmd.Flags().String("pirate-conf-path", "./PIRATE.conf", "conf file to pull RPC creds from")
 	rootCmd.Flags().String("rpcuser", "", "RPC user name")
 	rootCmd.Flags().String("rpcpassword", "", "RPC password")
 	rootCmd.Flags().String("rpchost", "", "RPC host")
@@ -356,8 +356,8 @@ func init() {
 	viper.SetDefault("log-level", int(logrus.InfoLevel))
 	viper.BindPFlag("log-file", rootCmd.Flags().Lookup("log-file"))
 	viper.SetDefault("log-file", "./server.log")
-	viper.BindPFlag("zcash-conf-path", rootCmd.Flags().Lookup("zcash-conf-path"))
-	viper.SetDefault("zcash-conf-path", "./zcash.conf")
+	viper.BindPFlag("pirate-conf-path", rootCmd.Flags().Lookup("pirate-conf-path"))
+	viper.SetDefault("pirate-conf-path", "./PIRATE.conf")
 	viper.BindPFlag("rpcuser", rootCmd.Flags().Lookup("rpcuser"))
 	viper.BindPFlag("rpcpassword", rootCmd.Flags().Lookup("rpcpassword"))
 	viper.BindPFlag("rpchost", rootCmd.Flags().Lookup("rpchost"))

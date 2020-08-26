@@ -1,4 +1,4 @@
-module github.com/adityapk00/lightwalletd
+module github.com/PirateNetwork/lightwalletd
 
 go 1.12
 
