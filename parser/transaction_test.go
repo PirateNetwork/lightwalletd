@@ -1,3 +1,6 @@
+// Copyright (c) 2019-2020 The Zcash developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
 package parser
 
 import (
@@ -48,10 +51,10 @@ type outputTestVector struct {
 
 type txTestVector struct {
 	// Sprout and Sapling
-	header, nVersionGroupId, nLockTime, nExpiryHeight string
-	vin, vout                                         [][]string
-	vJoinSplits                                       []joinSplitTestVector
-	joinSplitPubKey, joinSplitSig                     string
+	txid, header, nVersionGroupID, nLockTime, nExpiryHeight string
+	vin, vout                                               [][]string
+	vJoinSplits                                             []joinSplitTestVector
+	joinSplitPubKey, joinSplitSig                           string
 
 	// Sapling-only
 	valueBalance string // encoded int64
@@ -64,8 +67,9 @@ type txTestVector struct {
 var zip143tests = []txTestVector{
 	{
 		// Test vector 1
+		txid:            "f0b22277ac851b5f4df590fe6a128aad9d0ce8063235eb2b328c2dc6a23c1ec5",
 		header:          "03000080",
-		nVersionGroupId: "7082c403",
+		nVersionGroupID: "7082c403",
 		nLockTime:       "481cdd86",
 		nExpiryHeight:   "b3cc4318",
 		vin:             nil,
@@ -77,8 +81,9 @@ var zip143tests = []txTestVector{
 	{
 		// Test vector 2
 		//raw: "we have some raw data for this tx, which this comment is too small to contain",
+		txid:            "39fe585a56b005f568c3171d22afa916e946e2a8aff5971d58ee8a6fc1482059",
 		header:          "03000080",
-		nVersionGroupId: "7082c403",
+		nVersionGroupID: "7082c403",
 		nLockTime:       "97b0e4e4",
 		nExpiryHeight:   "c705fc05",
 		vin: [][]string{
@@ -159,9 +164,8 @@ func TestSproutTransactionParser(t *testing.T) {
 	defer testData.Close()
 
 	// Parse the raw transactions file
-	rawTxData := make([][]byte, len(zip143tests))
+	rawTxData := [][]byte{}
 	scan := bufio.NewScanner(testData)
-	count := 0
 	for scan.Scan() {
 		dataLine := scan.Text()
 		// Skip the comments
@@ -173,9 +177,7 @@ func TestSproutTransactionParser(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		rawTxData[count] = txData
-		count++
+		rawTxData = append(rawTxData, txData)
 	}
 
 	for i, tt := range zip143tests {
@@ -193,21 +195,21 @@ func TestSproutTransactionParser(t *testing.T) {
 		}
 
 		// Transaction metadata
-		if ok := subTestCommonBlockMeta(&tt, tx, t, i); !ok {
+		if !subTestCommonBlockMeta(&tt, tx, t, i) {
 			continue
 		}
 
 		// Transparent inputs and outputs
-		if ok := subTestTransparentInputs(tt.vin, tx.transparentInputs, t, i); !ok {
+		if !subTestTransparentInputs(tt.vin, tx.transparentInputs, t, i) {
 			continue
 		}
 
-		if ok := subTestTransparentOutputs(tt.vout, tx.transparentOutputs, t, i); !ok {
+		if !subTestTransparentOutputs(tt.vout, tx.transparentOutputs, t, i) {
 			continue
 		}
 
 		// JoinSplits
-		if ok := subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i); !ok {
+		if !subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i) {
 			continue
 		}
 
@@ -221,6 +223,9 @@ func TestSproutTransactionParser(t *testing.T) {
 		if !bytes.Equal(testJSSig, tx.joinSplitSig) {
 			t.Errorf("Test %d: jsSig mismatch %x %x", i, testJSSig, tx.joinSplitSig)
 			continue
+		}
+		if hex.EncodeToString(tx.GetDisplayHash()) != tt.txid {
+			t.Errorf("Test %d: incorrect txid", i)
 		}
 	}
 }
@@ -237,9 +242,9 @@ func subTestCommonBlockMeta(tt *txTestVector, tx *Transaction, t *testing.T, cas
 		return false
 	}
 
-	versionGroupBytes, _ := hex.DecodeString(tt.nVersionGroupId)
+	versionGroupBytes, _ := hex.DecodeString(tt.nVersionGroupID)
 	versionGroup := binary.LittleEndian.Uint32(versionGroupBytes)
-	if versionGroup != tx.nVersionGroupId {
+	if versionGroup != tx.nVersionGroupID {
 		t.Errorf("Test %d: unexpected versionGroupId", caseNum)
 		return false
 	}
@@ -507,8 +512,9 @@ func subTestTransparentOutputs(testOutputs [][]string, txOutputs []*txOut, t *te
 var zip243tests = []txTestVector{
 	// Test vector 1
 	{
+		txid:            "5fc4867a1b8bd5ab709799adf322a85d10607e053726d5f5ab4b1c9ab897e6bc",
 		header:          "04000080",
-		nVersionGroupId: "85202f89",
+		nVersionGroupID: "85202f89",
 		vin:             nil,
 		vout: [][]string{
 			{"e7719811893e0000", "095200ac6551ac636565"},
@@ -609,8 +615,9 @@ var zip243tests = []txTestVector{
 	},
 	// Test vector 2
 	{
+		txid:            "6732cf8d67aac5b82a2a0f0217a7d4aa245b2adb0b97fd2d923dfc674415e221",
 		header:          "04000080",
-		nVersionGroupId: "85202f89",
+		nVersionGroupID: "85202f89",
 		vin: [][]string{
 			{"56e551406a7ee8355656a21e43e38ce129fdadb759eddfa08f00fc8e567cef93", "c6792d01", "0763656300ac63ac", "8df04245"},
 			{"1a33590d3e8cf49b2627218f0c292fa66ada945fa55bb23548e33a83a562957a", "3149a993", "086a5352516a65006a", "78d97ce4"},
@@ -665,9 +672,8 @@ func TestSaplingTransactionParser(t *testing.T) {
 	defer testData.Close()
 
 	// Parse the raw transactions file
-	rawTxData := make([][]byte, len(zip243tests))
+	rawTxData := [][]byte{}
 	scan := bufio.NewScanner(testData)
-	count := 0
 	for scan.Scan() {
 		dataLine := scan.Text()
 		// Skip the comments
@@ -679,9 +685,7 @@ func TestSaplingTransactionParser(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		rawTxData[count] = txData
-		count++
+		rawTxData = append(rawTxData, txData)
 	}
 
 	for i, tt := range zip243tests {
@@ -698,21 +702,35 @@ func TestSaplingTransactionParser(t *testing.T) {
 			continue
 		}
 
+		// If the transaction is shorter than it should be, parsing
+		// should fail gracefully
+		for j := 0; j < len(rawTxData[i]); j++ {
+			_, err := tx.ParseFromSlice(rawTxData[i][0:j])
+			if err == nil {
+				t.Errorf("Test %d: Parsing transaction unexpected succeeded", i)
+				break
+			}
+			if len(rest) > 0 {
+				t.Errorf("Test %d: Parsing transaction unexpected rest", i)
+				break
+			}
+		}
+
 		// Transaction metadata
-		if ok := subTestCommonBlockMeta(&tt, tx, t, i); !ok {
+		if !subTestCommonBlockMeta(&tt, tx, t, i) {
 			continue
 		}
 
 		// Transparent inputs and outputs
-		if ok := subTestTransparentInputs(tt.vin, tx.transparentInputs, t, i); !ok {
+		if !subTestTransparentInputs(tt.vin, tx.transparentInputs, t, i) {
 			continue
 		}
-		if ok := subTestTransparentOutputs(tt.vout, tx.transparentOutputs, t, i); !ok {
+		if !subTestTransparentOutputs(tt.vout, tx.transparentOutputs, t, i) {
 			continue
 		}
 
 		// JoinSplits
-		if ok := subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i); !ok {
+		if !subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i) {
 			continue
 		}
 
@@ -736,11 +754,11 @@ func TestSaplingTransactionParser(t *testing.T) {
 			continue
 		}
 
-		if ok := subTestShieldedSpends(tt.spends, tx.shieldedSpends, t, i); !ok {
+		if !subTestShieldedSpends(tt.spends, tx.shieldedSpends, t, i) {
 			continue
 		}
 
-		if ok := subTestShieldedOutputs(tt.outputs, tx.shieldedOutputs, t, i); !ok {
+		if !subTestShieldedOutputs(tt.outputs, tx.shieldedOutputs, t, i) {
 			continue
 		}
 
@@ -748,6 +766,14 @@ func TestSaplingTransactionParser(t *testing.T) {
 		if !bytes.Equal(testBinding, tx.bindingSig) {
 			t.Errorf("Test %d: bindingSig %x %x", i, testBinding, tx.bindingSig)
 			continue
+		}
+
+		if hex.EncodeToString(tx.GetDisplayHash()) != tt.txid {
+			t.Errorf("Test %d: incorrect txid", i)
+		}
+		// test caching
+		if hex.EncodeToString(tx.GetDisplayHash()) != tt.txid {
+			t.Errorf("Test %d: incorrect cached txid", i)
 		}
 	}
 }
