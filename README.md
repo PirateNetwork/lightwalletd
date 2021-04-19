@@ -62,6 +62,9 @@ You can run the gRPC server with or without TLS, depending on how you configured
 ```
 go run cmd/server/main.go -bind-addr 127.0.0.1:9067 -conf-file ~/.zcash/zcash.conf -no-tls
 ```
+Type `./lightwalletd help` to see the full list of options and arguments.
+
+# Production Usage
 
 If you have a certificate that you want to use (either self signed, or from a certificate authority), pass the certificate to the frontend:
 

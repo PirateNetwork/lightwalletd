@@ -1,3 +1,8 @@
+// Copyright (c) 2019-2020 The Zcash developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
+
+// Package frontend implements the gRPC handlers called by the wallets.
 package frontend
 
 import (
@@ -5,115 +10,100 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"math"
-	"net"
+	"io"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/rpcclient"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/peer"
-
-	"github.com/adityapk00/lightwalletd/common"
-	"github.com/adityapk00/lightwalletd/walletrpc"
+	"github.com/zcash/lightwalletd/common"
+	"github.com/zcash/lightwalletd/parser"
+	"github.com/zcash/lightwalletd/walletrpc"
 )
 
-var (
-	ErrUnspecified = errors.New("request for unspecified identifier")
-)
-
-type latencyCacheEntry struct {
-	timeNanos   int64
-	lastBlock   uint64
-	totalBlocks uint64
+type lwdStreamer struct {
+	cache      *common.BlockCache
+	chainName  string
+	pingEnable bool
+	walletrpc.UnimplementedCompactTxStreamerServer
 }
 
-// the service type
-type SqlStreamer struct {
-	cache        *common.BlockCache
-	client       *rpcclient.Client
-	log          *logrus.Entry
-	metrics      *common.PrometheusMetrics
-	latencyCache map[string]*latencyCacheEntry
-	latencyMutex sync.RWMutex
+// NewLwdStreamer constructs a gRPC context.
+func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool) (walletrpc.CompactTxStreamerServer, error) {
+	return &lwdStreamer{cache: cache, chainName: chainName, pingEnable: enablePing}, nil
 }
 
-func NewSQLiteStreamer(client *rpcclient.Client, cache *common.BlockCache, log *logrus.Entry, metrics *common.PrometheusMetrics) (walletrpc.CompactTxStreamerServer, error) {
-	return &SqlStreamer{cache, client, log, metrics, make(map[string]*latencyCacheEntry), sync.RWMutex{}}, nil
+// DarksideStreamer holds the gRPC state for darksidewalletd.
+type DarksideStreamer struct {
+	cache *common.BlockCache
+	walletrpc.UnimplementedDarksideStreamerServer
 }
 
-func (s *SqlStreamer) GracefulStop() error {
+// NewDarksideStreamer constructs a gRPC context for darksidewalletd.
+func NewDarksideStreamer(cache *common.BlockCache) (walletrpc.DarksideStreamerServer, error) {
+	return &DarksideStreamer{cache: cache}, nil
+}
+
+// Test to make sure Address is a single t address
+func checkTaddress(taddr string) error {
+	match, err := regexp.Match("\\At[a-zA-Z0-9]{34}\\z", []byte(taddr))
+	if err != nil || !match {
+		return errors.New("Invalid address")
+	}
 	return nil
 }
 
-func (s *SqlStreamer) GetCache() *common.BlockCache {
-	return s.cache
-}
-
-func (s *SqlStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
-	latestBlock := s.cache.GetLatestBlock()
+// GetLatestBlock returns the height of the best chain, according to zcashd.
+func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
+	latestBlock := s.cache.GetLatestHeight()
 
 	if latestBlock == -1 {
-		s.metrics.TotalErrors.Inc()
-
-		return nil, errors.New("Cache is empty. Server is probably not yet ready.")
+		return nil, errors.New("Cache is empty. Server is probably not yet ready")
 	}
-
-	s.metrics.LatestBlockCounter.Inc()
 
 	// TODO: also return block hashes here
 	return &walletrpc.BlockID{Height: uint64(latestBlock)}, nil
 }
 
-func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetAddressTxidsServer) error {
-	var err error
-	var errCode int64
-
-	if addressBlockFilter == nil || addressBlockFilter.Range == nil || addressBlockFilter.Range.Start == nil || addressBlockFilter.Range.End == nil {
-		s.log.Errorf("Bad Structure")
-		return ErrUnspecified
+// GetTaddressTxids is a streaming RPC that returns transaction IDs that have
+// the given transparent address (taddr) as either an input or output.
+func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetTaddressTxidsServer) error {
+	if err := checkTaddress(addressBlockFilter.Address); err != nil {
+		return err
 	}
 
-	// Test to make sure Address is a single t address
-	match, err := regexp.Match("^t[a-zA-Z0-9]{34}$", []byte(addressBlockFilter.Address))
-	if err != nil || !match {
-		s.metrics.TotalErrors.Inc()
-
-		s.log.Errorf("Unrecognized address: %s", addressBlockFilter.Address)
-		return errors.New("Unrecognized Address")
+	if addressBlockFilter.Range == nil {
+		return errors.New("Must specify block range")
 	}
-
+	if addressBlockFilter.Range.Start == nil {
+		return errors.New("Must specify a start block height")
+	}
+	if addressBlockFilter.Range.End == nil {
+		return errors.New("Must specify an end block height")
+	}
 	params := make([]json.RawMessage, 1)
-	st := "{\"addresses\": [\"" + addressBlockFilter.Address + "\"]," +
-		"\"start\": " + strconv.FormatUint(addressBlockFilter.Range.Start.Height, 10) +
-		", \"end\": " + strconv.FormatUint(addressBlockFilter.Range.End.Height, 10) + "}"
-
-	params[0] = json.RawMessage(st)
-
-	result, rpcErr := s.client.RawRequest("getaddresstxids", params)
+	request := &common.ZcashdRpcRequestGetaddresstxids{
+		Addresses: []string{addressBlockFilter.Address},
+		Start:     addressBlockFilter.Range.Start.Height,
+		End:       addressBlockFilter.Range.End.Height,
+	}
+	param, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+	params[0] = param
+	result, rpcErr := common.RawRequest("getaddresstxids", params)
 
 	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
-		s.metrics.TotalErrors.Inc()
-
-		s.log.Errorf("Got error: %s", rpcErr.Error())
-		errParts := strings.SplitN(rpcErr.Error(), ":", 2)
-		errCode, err = strconv.ParseInt(errParts[0], 10, 32)
-		//Check to see if we are requesting a height the zcashd doesn't have yet
-		if err == nil && errCode == -8 {
-			return ErrUnspecified
-		}
 		return rpcErr
 	}
 
 	var txids []string
 	err = json.Unmarshal(result, &txids)
 	if err != nil {
-		s.log.Errorf("Got error: %s", err.Error())
 		return err
 	}
 
@@ -124,86 +114,30 @@ func (s *SqlStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 		txid, _ := hex.DecodeString(txidstr)
 		// Txid is read as a string, which is in big-endian order. But when converting
 		// to bytes, it should be little-endian
-		for left, right := 0, len(txid)-1; left < right; left, right = left+1, right-1 {
-			txid[left], txid[right] = txid[right], txid[left]
-		}
-
-		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: txid})
+		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: parser.Reverse(txid)})
 		if err != nil {
-			s.metrics.TotalErrors.Inc()
-
-			s.log.Errorf("Got error: %s", err.Error())
 			return err
 		}
-
-		resp.Send(tx)
+		if err = resp.Send(tx); err != nil {
+			return err
+		}
 	}
-
-	go func() {
-		s.log.WithFields(logrus.Fields{
-			"method":  "GetAddressTxids",
-			"address": addressBlockFilter.Address,
-			"start":   addressBlockFilter.Range.Start.Height,
-			"end":     addressBlockFilter.Range.End.Height,
-		}).Info("Service")
-	}()
-
 	return nil
 }
 
-func (s *SqlStreamer) peerIPFromContext(ctx context.Context) string {
-	if xRealIP, ok := metadata.FromIncomingContext(ctx); ok {
-		realIP := xRealIP.Get("x-real-ip")
-		if len(realIP) > 0 {
-			return realIP[0]
-		}
+// GetBlock returns the compact block at the requested height. Requesting a
+// block by hash is not yet supported.
+func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
+	if id.Height == 0 && id.Hash == nil {
+		return nil, errors.New("request for unspecified identifier")
 	}
-
-	if peerInfo, ok := peer.FromContext(ctx); ok {
-		ip, _, err := net.SplitHostPort(peerInfo.Addr.String())
-		if err == nil {
-			return ip
-		}
-	}
-
-	return "unknown"
-}
-
-func (s *SqlStreamer) dailyActiveBlock(height uint64, peerip string) {
-	if height%1152 == 0 {
-		s.log.WithFields(logrus.Fields{
-			"method":       "DailyActiveBlock",
-			"peer_addr":    peerip,
-			"block_height": height,
-		}).Info("Service")
-	}
-}
-
-func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
-
-	if id == nil || (id.Height == 0 && id.Hash == nil) {
-		return nil, ErrUnspecified
-	}
-
-	s.log.WithFields(logrus.Fields{
-		"method": "GetBlockRange",
-		"start":  id.Height,
-		"end":    id.Height,
-	}).Info("Service")
-
-	// Log a daily active user if the user requests the day's "key block"
-	go func() {
-		s.dailyActiveBlock(id.Height, s.peerIPFromContext(ctx))
-	}()
 
 	// Precedence: a hash is more specific than a height. If we have it, use it first.
 	if id.Hash != nil {
 		// TODO: Get block by hash
-		s.metrics.TotalErrors.Inc()
-
 		return nil, errors.New("GetBlock by Hash is not yet implemented")
-	} else {
-		cBlock, err := common.GetBlock(s.client, s.cache, int(id.Height))
+	}
+	cBlock, err := common.GetBlock(s.cache, int(id.Height))
 
 		if err != nil {
 			return nil, err
@@ -213,78 +147,20 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 		return cBlock, err
 	}
 
+	return cBlock, err
 }
 
-func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
-	if span == nil || span.Start == nil || span.End == nil {
-		return ErrUnspecified
+// GetBlockRange is a streaming RPC that returns blocks, in compact form,
+// (as also returned by GetBlock) from the block height 'start' to height
+// 'end' inclusively.
+func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
+	blockChan := make(chan *walletrpc.CompactBlock)
+	errChan := make(chan error)
+	if span.Start == nil || span.End == nil {
+		return errors.New("Must specify start and end heights")
 	}
 
-	blockChan := make(chan walletrpc.CompactBlock)
-	errChan := make(chan error)
-
-	peerip := s.peerIPFromContext(resp.Context())
-
-	// Latency logging
-	go func() {
-		// If there is no ip, ignore
-		if peerip == "unknown" {
-			return
-		}
-
-		// Log only if bulk requesting blocks
-		if span.End.Height-span.Start.Height < 100 {
-			return
-		}
-
-		now := time.Now().UnixNano()
-		s.latencyMutex.Lock()
-		defer s.latencyMutex.Unlock()
-
-		// remove all old entries
-		for ip, entry := range s.latencyCache {
-			if entry.timeNanos+int64(30*math.Pow10(9)) < now { // delete after 30 seconds
-				delete(s.latencyCache, ip)
-			}
-		}
-
-		// Look up if this ip address has a previous getblock range
-		if entry, ok := s.latencyCache[peerip]; ok {
-			// Log only continous blocks
-			if entry.lastBlock+1 == span.Start.Height {
-				s.log.WithFields(logrus.Fields{
-					"method":         "GetBlockRangeLatency",
-					"peer_addr":      peerip,
-					"num_blocks":     entry.totalBlocks,
-					"end_height":     entry.lastBlock,
-					"latency_millis": (now - entry.timeNanos) / int64(math.Pow10(6)),
-				}).Info("Service")
-			}
-		}
-
-		// Add or update the ip entry
-		s.latencyCache[peerip] = &latencyCacheEntry{
-			lastBlock:   span.End.Height,
-			totalBlocks: span.End.Height - span.Start.Height + 1,
-			timeNanos:   now,
-		}
-	}()
-
-	// Log a daily active user if the user requests the day's "key block"
-	go func() {
-		for height := span.Start.Height; height <= span.End.Height; height++ {
-			s.dailyActiveBlock(height, peerip)
-		}
-	}()
-
-	s.log.WithFields(logrus.Fields{
-		"method":    "GetBlockRange",
-		"start":     span.Start.Height,
-		"end":       span.End.Height,
-		"peer_addr": peerip,
-	}).Info("Service")
-
-	go common.GetBlockRange(s.client, s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
+	go common.GetBlockRange(s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
 
 	for {
 		select {
@@ -293,154 +169,127 @@ func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 			s.metrics.TotalErrors.Inc()
 			return err
 		case cBlock := <-blockChan:
-			s.metrics.TotalBlocksServedConter.Inc()
-			err := resp.Send(&cBlock)
+			err := resp.Send(cBlock)
 			if err != nil {
 				return err
 			}
 		}
 	}
-
 }
 
-func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
-
-	var txBytes []byte
-	var txHeight float64
-
-	if txf == nil {
-		return nil, ErrUnspecified
+// GetTreeState returns the note commitment tree state corresponding to the given block.
+// See section 3.7 of the Zcash protocol specification. It returns several other useful
+// values also (even though they can be obtained using GetBlock).
+// The block can be specified by either height or hash.
+func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.TreeState, error) {
+	if id.Height == 0 && id.Hash == nil {
+		return nil, errors.New("request for unspecified identifier")
 	}
+	// The Zcash z_gettreestate rpc accepts either a block height or block hash
+	params := make([]json.RawMessage, 1)
+	var hashJSON []byte
+	if id.Height > 0 {
+		heightJSON, err := json.Marshal(strconv.Itoa(int(id.Height)))
+		if err != nil {
+			return nil, err
+		}
+		params[0] = heightJSON
+	} else {
+		// id.Hash is big-endian, keep in big-endian for the rpc
+		hashJSON, err := json.Marshal(hex.EncodeToString(id.Hash))
+		if err != nil {
+			return nil, err
+		}
+		params[0] = hashJSON
+	}
+	var gettreestateReply common.ZcashdRpcReplyGettreestate
+	for {
+		result, rpcErr := common.RawRequest("z_gettreestate", params)
+		if rpcErr != nil {
+			return nil, rpcErr
+		}
+		err := json.Unmarshal(result, &gettreestateReply)
+		if err != nil {
+			return nil, err
+		}
+		if gettreestateReply.Sapling.Commitments.FinalState != "" {
+			break
+		}
+		if gettreestateReply.Sapling.SkipHash == "" {
+			break
+		}
+		hashJSON, err = json.Marshal(gettreestateReply.Sapling.SkipHash)
+		if err != nil {
+			return nil, err
+		}
+		params[0] = hashJSON
+	}
+	if gettreestateReply.Sapling.Commitments.FinalState == "" {
+		return nil, errors.New("zcashd did not return treestate")
+	}
+	return &walletrpc.TreeState{
+		Network: s.chainName,
+		Height:  uint64(gettreestateReply.Height),
+		Hash:    gettreestateReply.Hash,
+		Time:    gettreestateReply.Time,
+		Tree:    gettreestateReply.Sapling.Commitments.FinalState,
+	}, nil
+}
 
+// GetTransaction returns the raw transaction bytes that are returned
+// by the zcashd 'getrawtransaction' RPC.
+func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
 	if txf.Hash != nil {
-		txid := txf.Hash
-		for left, right := 0, len(txid)-1; left < right; left, right = left+1, right-1 {
-			txid[left], txid[right] = txid[right], txid[left]
+		if len(txf.Hash) != 32 {
+			return nil, errors.New("Transaction ID has invalid length")
 		}
-		leHashString := hex.EncodeToString(txid)
-
-		// First call to get the raw transaction bytes
-		params := make([]json.RawMessage, 1)
-		params[0] = json.RawMessage("\"" + leHashString + "\"")
-
-		result, rpcErr := s.client.RawRequest("getrawtransaction", params)
-
-		var err error
-		var errCode int64
-		// For some reason, the error responses are not JSON
-		if rpcErr != nil {
-			s.metrics.TotalErrors.Inc()
-
-			s.log.Errorf("Got error: %s", rpcErr.Error())
-			errParts := strings.SplitN(rpcErr.Error(), ":", 2)
-			errCode, err = strconv.ParseInt(errParts[0], 10, 32)
-			//Check to see if we are requesting a height the zcashd doesn't have yet
-			if err == nil && errCode == -8 {
-				return nil, err
-			}
-			return nil, err
-		}
-
-		var txhex string
-		err = json.Unmarshal(result, &txhex)
+		leHashStringJSON, err := json.Marshal(hex.EncodeToString(parser.Reverse(txf.Hash)))
 		if err != nil {
 			return nil, err
 		}
-
-		txBytes, err = hex.DecodeString(txhex)
-		if err != nil {
-			return nil, err
+		params := []json.RawMessage{
+			leHashStringJSON,
+			json.RawMessage("1"),
 		}
-
-		// Second call to get height
-		params = make([]json.RawMessage, 2)
-		params[0] = json.RawMessage("\"" + leHashString + "\"")
-		params[1] = json.RawMessage("1")
-
-		result, rpcErr = s.client.RawRequest("getrawtransaction", params)
+		result, rpcErr := common.RawRequest("getrawtransaction", params)
 
 		// For some reason, the error responses are not JSON
 		if rpcErr != nil {
-			s.metrics.TotalErrors.Inc()
-
-			s.log.Errorf("Got error: %s", rpcErr.Error())
-			errParts := strings.SplitN(rpcErr.Error(), ":", 2)
-			errCode, err = strconv.ParseInt(errParts[0], 10, 32)
-			//Check to see if we are requesting a height the zcashd doesn't have yet
-			if err == nil && errCode == -8 {
-				return nil, err
-			}
-			return nil, err
+			return nil, rpcErr
 		}
-
-		var txinfo interface{}
+		// Many other fields are returned, but we need only these two.
+		var txinfo common.ZcashdRpcReplyGetrawtransaction
 		err = json.Unmarshal(result, &txinfo)
 		if err != nil {
 			return nil, err
 		}
-		txHeight = txinfo.(map[string]interface{})["height"].(float64)
-
-		go func() {
-			peerip := s.peerIPFromContext(ctx)
-
-			s.log.WithFields(logrus.Fields{
-				"method":    "GetTransaction",
-				"hash":      leHashString,
-				"peer_addr": peerip,
-			}).Info("Service")
-		}()
-
-		return &walletrpc.RawTransaction{Data: txBytes, Height: uint64(txHeight)}, nil
+		txBytes, err := hex.DecodeString(txinfo.Hex)
+		if err != nil {
+			return nil, err
+		}
+		return &walletrpc.RawTransaction{
+			Data:   txBytes,
+			Height: uint64(txinfo.Height),
+		}, nil
 	}
 
-	if txf.Block.Hash != nil {
-		s.metrics.TotalErrors.Inc()
-
-		s.log.Error("Can't GetTransaction with a blockhash+num. Please call GetTransaction with txid")
+	if txf.Block != nil && txf.Block.Hash != nil {
 		return nil, errors.New("Can't GetTransaction with a blockhash+num. Please call GetTransaction with txid")
 	}
-
-	return &walletrpc.RawTransaction{Data: txBytes, Height: uint64(txHeight)}, nil
+	return nil, errors.New("Please call GetTransaction with txid")
 }
 
-// GetLightdInfo gets the LightWalletD (this server) info
-func (s *SqlStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
-
-	saplingHeight, blockHeight, chainName, consensusBranchId, err := common.GetSaplingInfo(s.client)
-
-	if err != nil {
-		s.log.WithFields(logrus.Fields{
-			"error": err,
-		}).Warn("Unable to get sapling activation height")
-
-		s.metrics.TotalErrors.Inc()
-		return nil, err
-	}
-
-	// TODO these are called Error but they aren't at the moment.
-	// A success will return code 0 and message txhash.
-	return &walletrpc.LightdInfo{
-		Version:                 "0.1-zeclightd",
-		Vendor:                  "ZecWallet LightWalletD",
-		TaddrSupport:            true,
-		ChainName:               chainName,
-		SaplingActivationHeight: uint64(saplingHeight),
-		ConsensusBranchId:       consensusBranchId,
-		BlockHeight:             uint64(blockHeight),
-	}, nil
+// GetLightdInfo gets the LightWalletD (this server) info, and includes information
+// it gets from its backend zcashd.
+func (s *lwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
+	return common.GetLightdInfo()
 }
 
 // SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
-func (s *SqlStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
+func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
 	// sendrawtransaction "hexstring" ( allowhighfees )
 	//
-	// Submits raw transaction (serialized, hex-encoded) to local node and network.
-	//
-	// Also see createrawtransaction and signrawtransaction calls.
-	//
-	// Arguments:
-	// 1. "hexstring"    (string, required) The hex string of the raw transaction)
-	// 2. allowhighfees    (boolean, optional, default=false) Allow high fees
+	// Submits raw transaction (binary) to local node and network.
 	//
 	// Result:
 	// "hex"             (string) The transaction hash in hex
@@ -451,17 +300,22 @@ func (s *SqlStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 
 	// Construct raw JSON-RPC params
 	params := make([]json.RawMessage, 1)
-	txHexString := hex.EncodeToString(rawtx.Data)
-	params[0] = json.RawMessage("\"" + txHexString + "\"")
-	result, rpcErr := s.client.RawRequest("sendrawtransaction", params)
+	txJSON, err := json.Marshal(hex.EncodeToString(rawtx.Data))
+	if err != nil {
+		return &walletrpc.SendResponse{}, err
+	}
+	params[0] = txJSON
+	result, rpcErr := common.RawRequest("sendrawtransaction", params)
 
-	var err error
 	var errCode int64
 	var errMsg string
 
 	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
 		errParts := strings.SplitN(rpcErr.Error(), ":", 2)
+		if len(errParts) < 2 {
+			return nil, errors.New("SendTransaction couldn't parse error code")
+		}
 		errMsg = strings.TrimSpace(errParts[1])
 		errCode, err = strconv.ParseInt(errParts[0], 10, 32)
 		if err != nil {
@@ -483,4 +337,385 @@ func (s *SqlStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	s.metrics.SendTransactionsCounter.Inc()
 
 	return resp, nil
+}
+
+func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, error) {
+	for _, addr := range addressList {
+		if err := checkTaddress(addr); err != nil {
+			return &walletrpc.Balance{}, err
+		}
+	}
+	params := make([]json.RawMessage, 1)
+	addrList := &common.ZcashdRpcRequestGetaddressbalance{
+		Addresses: addressList,
+	}
+	param, err := json.Marshal(addrList)
+	if err != nil {
+		return &walletrpc.Balance{}, err
+	}
+	params[0] = param
+
+	result, rpcErr := common.RawRequest("getaddressbalance", params)
+	if rpcErr != nil {
+		return &walletrpc.Balance{}, rpcErr
+	}
+	var balanceReply common.ZcashdRpcReplyGetaddressbalance
+	err = json.Unmarshal(result, &balanceReply)
+	if err != nil {
+		return &walletrpc.Balance{}, err
+	}
+	return &walletrpc.Balance{ValueZat: balanceReply.Balance}, nil
+}
+
+// GetTaddressBalance returns the total balance for a list of taddrs
+func (s *lwdStreamer) GetTaddressBalance(ctx context.Context, addresses *walletrpc.AddressList) (*walletrpc.Balance, error) {
+	return getTaddressBalanceZcashdRpc(addresses.Addresses)
+}
+
+// GetTaddressBalanceStream returns the total balance for a list of taddrs
+func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStreamer_GetTaddressBalanceStreamServer) error {
+	addressList := make([]string, 0)
+	for {
+		addr, err := addresses.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		addressList = append(addressList, addr.Address)
+	}
+	balance, err := getTaddressBalanceZcashdRpc(addressList)
+	if err != nil {
+		return err
+	}
+	addresses.SendAndClose(balance)
+	return nil
+}
+
+// Key is 32-byte txid (as a 64-character string), data is pointer to compact tx.
+var mempoolMap *map[string]*walletrpc.CompactTx
+var mempoolList []string
+
+// Last time we pulled a copy of the mempool from zcashd.
+var lastMempool time.Time
+
+func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.CompactTxStreamer_GetMempoolTxServer) error {
+	if time.Now().Sub(lastMempool).Seconds() >= 2 {
+		lastMempool = time.Now()
+		// Refresh our copy of the mempool.
+		params := make([]json.RawMessage, 0)
+		result, rpcErr := common.RawRequest("getrawmempool", params)
+		if rpcErr != nil {
+			return rpcErr
+		}
+		err := json.Unmarshal(result, &mempoolList)
+		if err != nil {
+			return err
+		}
+		newmempoolMap := make(map[string]*walletrpc.CompactTx)
+		if mempoolMap == nil {
+			mempoolMap = &newmempoolMap
+		}
+		for _, txidstr := range mempoolList {
+			if ctx, ok := (*mempoolMap)[txidstr]; ok {
+				// This ctx has already been fetched, copy pointer to it.
+				newmempoolMap[txidstr] = ctx
+				continue
+			}
+			txidJSON, err := json.Marshal(txidstr)
+			if err != nil {
+				return err
+			}
+			// The "0" is because we only need the raw hex, which is returned as
+			// just a hex string, and not even a json string (with quotes).
+			params := []json.RawMessage{txidJSON, json.RawMessage("0")}
+			result, rpcErr := common.RawRequest("getrawtransaction", params)
+			if rpcErr != nil {
+				// Not an error; mempool transactions can disappear
+				continue
+			}
+			// strip the quotes
+			var txStr string
+			err = json.Unmarshal(result, &txStr)
+			if err != nil {
+				return err
+			}
+
+			// conver to binary
+			txBytes, err := hex.DecodeString(txStr)
+			if err != nil {
+				return err
+			}
+			tx := parser.NewTransaction()
+			txdata, err := tx.ParseFromSlice(txBytes)
+			if len(txdata) > 0 {
+				return errors.New("extra data deserializing transaction")
+			}
+			newmempoolMap[txidstr] = &walletrpc.CompactTx{}
+			if tx.HasSaplingElements() {
+				newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
+			}
+		}
+		mempoolMap = &newmempoolMap
+	}
+	excludeHex := make([]string, len(exclude.Txid))
+	for i := 0; i < len(exclude.Txid); i++ {
+		excludeHex[i] = hex.EncodeToString(parser.Reverse(exclude.Txid[i]))
+	}
+	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
+		tx := (*mempoolMap)[txid]
+		if len(tx.Hash) > 0 {
+			err := resp.Send(tx)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Return the subset of items that aren't excluded, but
+// if more than one item matches an exclude entry, return
+// all those items.
+func MempoolFilter(items, exclude []string) []string {
+	sort.Slice(items, func(i, j int) bool {
+		return items[i] < items[j]
+	})
+	sort.Slice(exclude, func(i, j int) bool {
+		return exclude[i] < exclude[j]
+	})
+	// Determine how many items match each exclude item.
+	nmatches := make([]int, len(exclude))
+	// is the exclude string less than the item string?
+	lessthan := func(e, i string) bool {
+		l := len(e)
+		if l > len(i) {
+			l = len(i)
+		}
+		return e < i[0:l]
+	}
+	ei := 0
+	for _, item := range items {
+		for ei < len(exclude) && lessthan(exclude[ei], item) {
+			ei++
+		}
+		match := ei < len(exclude) && strings.HasPrefix(item, exclude[ei])
+		if match {
+			nmatches[ei]++
+		}
+	}
+
+	// Add each item that isn't uniquely excluded to the results.
+	tosend := make([]string, 0)
+	ei = 0
+	for _, item := range items {
+		for ei < len(exclude) && lessthan(exclude[ei], item) {
+			ei++
+		}
+		match := ei < len(exclude) && strings.HasPrefix(item, exclude[ei])
+		if !match || nmatches[ei] > 1 {
+			tosend = append(tosend, item)
+		}
+	}
+	return tosend
+}
+
+func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAddressUtxosReply) error) error {
+	for _, a := range arg.Addresses {
+		if err := checkTaddress(a); err != nil {
+			return err
+		}
+	}
+	params := make([]json.RawMessage, 1)
+	addrList := &common.ZcashdRpcRequestGetaddressutxos{
+		Addresses: arg.Addresses,
+	}
+	param, err := json.Marshal(addrList)
+	if err != nil {
+		return err
+	}
+	params[0] = param
+	result, rpcErr := common.RawRequest("getaddressutxos", params)
+	if rpcErr != nil {
+		return rpcErr
+	}
+	var utxosReply common.ZcashdRpcReplyGetaddressutxos
+	err = json.Unmarshal(result, &utxosReply)
+	if err != nil {
+		return err
+	}
+	n := 0
+	for _, utxo := range utxosReply {
+		if uint64(utxo.Height) < arg.StartHeight {
+			continue
+		}
+		n++
+		if arg.MaxEntries > 0 && uint32(n) > arg.MaxEntries {
+			break
+		}
+		txidBytes, err := hex.DecodeString(utxo.Txid)
+		if err != nil {
+			return err
+		}
+		scriptBytes, err := hex.DecodeString(utxo.Script)
+		if err != nil {
+			return err
+		}
+		err = f(&walletrpc.GetAddressUtxosReply{
+			Address:  utxo.Address,
+			Txid:     parser.Reverse(txidBytes),
+			Index:    int32(utxo.OutputIndex),
+			Script:   scriptBytes,
+			ValueZat: int64(utxo.Satoshis),
+			Height:   uint64(utxo.Height),
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *lwdStreamer) GetAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg) (*walletrpc.GetAddressUtxosReplyList, error) {
+	addressUtxos := make([]*walletrpc.GetAddressUtxosReply, 0)
+	err := getAddressUtxos(arg, func(utxo *walletrpc.GetAddressUtxosReply) error {
+		addressUtxos = append(addressUtxos, utxo)
+		return nil
+	})
+	if err != nil {
+		return &walletrpc.GetAddressUtxosReplyList{}, err
+	}
+	return &walletrpc.GetAddressUtxosReplyList{AddressUtxos: addressUtxos}, nil
+}
+
+func (s *lwdStreamer) GetAddressUtxosStream(arg *walletrpc.GetAddressUtxosArg, resp walletrpc.CompactTxStreamer_GetAddressUtxosStreamServer) error {
+	err := getAddressUtxos(arg, func(utxo *walletrpc.GetAddressUtxosReply) error {
+		return resp.Send(utxo)
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// This rpc is used only for testing.
+var concurrent int64
+
+func (s *lwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*walletrpc.PingResponse, error) {
+	// This gRPC allows the client to create an arbitrary number of
+	// concurrent threads, which could run the server out of resources,
+	// so only allow if explicitly enabled.
+	if !s.pingEnable {
+		return nil, errors.New("Ping not enabled, start lightwalletd with --ping-very-insecure")
+	}
+	var response walletrpc.PingResponse
+	response.Entry = atomic.AddInt64(&concurrent, 1)
+	time.Sleep(time.Duration(in.IntervalUs) * time.Microsecond)
+	response.Exit = atomic.AddInt64(&concurrent, -1)
+	return &response, nil
+}
+
+// SetMetaState lets the test driver control some GetLightdInfo values.
+func (s *DarksideStreamer) Reset(ctx context.Context, ms *walletrpc.DarksideMetaState) (*walletrpc.Empty, error) {
+	match, err := regexp.Match("\\A[a-fA-F0-9]+\\z", []byte(ms.BranchID))
+	if err != nil || !match {
+		return nil, errors.New("Invalid branch ID")
+	}
+
+	match, err = regexp.Match("\\A[a-zA-Z0-9]+\\z", []byte(ms.ChainName))
+	if err != nil || !match {
+		return nil, errors.New("Invalid chain name")
+	}
+	err = common.DarksideReset(int(ms.SaplingActivation), ms.BranchID, ms.ChainName)
+	if err != nil {
+		return nil, err
+	}
+	mempoolMap = nil
+	mempoolList = nil
+	return &walletrpc.Empty{}, nil
+}
+
+// StageBlocksStream accepts a list of blocks from the wallet test code,
+// and makes them available to present from the mock zcashd's GetBlock rpc.
+func (s *DarksideStreamer) StageBlocksStream(blocks walletrpc.DarksideStreamer_StageBlocksStreamServer) error {
+	for {
+		b, err := blocks.Recv()
+		if err == io.EOF {
+			blocks.SendAndClose(&walletrpc.Empty{})
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		common.DarksideStageBlockStream(b.Block)
+	}
+}
+
+// StageBlocks loads blocks from the given URL to the staging area.
+func (s *DarksideStreamer) StageBlocks(ctx context.Context, u *walletrpc.DarksideBlocksURL) (*walletrpc.Empty, error) {
+	if err := common.DarksideStageBlocks(u.Url); err != nil {
+		return nil, err
+	}
+	return &walletrpc.Empty{}, nil
+}
+
+// StageBlocksCreate stages a set of synthetic (manufactured on the fly) blocks.
+func (s *DarksideStreamer) StageBlocksCreate(ctx context.Context, e *walletrpc.DarksideEmptyBlocks) (*walletrpc.Empty, error) {
+	if err := common.DarksideStageBlocksCreate(e.Height, e.Nonce, e.Count); err != nil {
+		return nil, err
+	}
+	return &walletrpc.Empty{}, nil
+}
+
+// StageTransactionsStream adds the given transactions to the staging area.
+func (s *DarksideStreamer) StageTransactionsStream(tx walletrpc.DarksideStreamer_StageTransactionsStreamServer) error {
+	// My current thinking is that this should take a JSON array of {height, txid}, store them,
+	// then DarksideAddBlock() would "inject" transactions into blocks as its storing
+	// them (remembering to update the header so the block hash changes).
+	for {
+		transaction, err := tx.Recv()
+		if err == io.EOF {
+			tx.SendAndClose(&walletrpc.Empty{})
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		err = common.DarksideStageTransaction(int(transaction.Height), transaction.Data)
+		if err != nil {
+			return err
+		}
+	}
+}
+
+// StageTransactions loads blocks from the given URL to the staging area.
+func (s *DarksideStreamer) StageTransactions(ctx context.Context, u *walletrpc.DarksideTransactionsURL) (*walletrpc.Empty, error) {
+	if err := common.DarksideStageTransactionsURL(int(u.Height), u.Url); err != nil {
+		return nil, err
+	}
+	return &walletrpc.Empty{}, nil
+}
+
+// ApplyStaged merges all staged transactions into staged blocks and all staged blocks into the active blockchain.
+func (s *DarksideStreamer) ApplyStaged(ctx context.Context, h *walletrpc.DarksideHeight) (*walletrpc.Empty, error) {
+	return &walletrpc.Empty{}, common.DarksideApplyStaged(int(h.Height))
+}
+
+// GetIncomingTransactions returns the transactions that were submitted via SendTransaction().
+func (s *DarksideStreamer) GetIncomingTransactions(in *walletrpc.Empty, resp walletrpc.DarksideStreamer_GetIncomingTransactionsServer) error {
+	// Get all of the incoming transactions we're received via SendTransaction()
+	for _, txBytes := range common.DarksideGetIncomingTransactions() {
+		err := resp.Send(&walletrpc.RawTransaction{Data: txBytes, Height: 0})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ClearIncomingTransactions empties the incoming transaction list.
+func (s *DarksideStreamer) ClearIncomingTransactions(ctx context.Context, e *walletrpc.Empty) (*walletrpc.Empty, error) {
+	common.DarksideClearIncomingTransactions()
+	return &walletrpc.Empty{}, nil
 }
