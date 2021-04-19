@@ -353,4 +353,4 @@ grpcurl -plaintext -d '{"txid":["qg=="]}' localhost:9067 cash.z.wallet.sdk.rpc.C
 
 Check out some of the potential security test cases here: [wallet <->
 lightwalletd integration
-tests](https://github.com/zcash/lightwalletd/blob/master/docs/integration-tests.md)
+tests](https://github.com/adityapk00/lightwalletd/blob/master/docs/integration-tests.md)

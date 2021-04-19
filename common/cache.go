@@ -15,8 +15,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/adityapk00/lightwalletd/walletrpc"
 	"github.com/golang/protobuf/proto"
-	"github.com/zcash/lightwalletd/walletrpc"
 )
 
 // BlockCache contains a consecutive set of recent compact blocks in marshalled form.

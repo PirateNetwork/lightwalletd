@@ -1,6 +1,6 @@
 package main
 
-import "github.com/zcash/lightwalletd/cmd"
+import "github.com/adityapk00/lightwalletd/cmd"
 
 func main() {
 	cmd.Execute()

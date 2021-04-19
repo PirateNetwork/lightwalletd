@@ -18,9 +18,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zcash/lightwalletd/common"
-	"github.com/zcash/lightwalletd/parser"
-	"github.com/zcash/lightwalletd/walletrpc"
+	"github.com/adityapk00/lightwalletd/common"
+	"github.com/adityapk00/lightwalletd/parser"
+	"github.com/adityapk00/lightwalletd/walletrpc"
 )
 
 type lwdStreamer struct {
@@ -139,12 +139,8 @@ func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 	}
 	cBlock, err := common.GetBlock(s.cache, int(id.Height))
 
-		if err != nil {
-			return nil, err
-		}
-
-		s.metrics.TotalBlocksServedConter.Inc()
-		return cBlock, err
+	if err != nil {
+		return nil, err
 	}
 
 	return cBlock, err
@@ -166,7 +162,7 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 		select {
 		case err := <-errChan:
 			// this will also catch context.DeadlineExceeded from the timeout
-			s.metrics.TotalErrors.Inc()
+			//s.metrics.TotalErrors.Inc()
 			return err
 		case cBlock := <-blockChan:
 			err := resp.Send(cBlock)
@@ -295,7 +291,7 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	// "hex"             (string) The transaction hash in hex
 
 	if rawtx == nil || rawtx.Data == nil {
-		return nil, ErrUnspecified
+		return nil, errors.New("Bad Transaction or Data")
 	}
 
 	// Construct raw JSON-RPC params
@@ -334,7 +330,7 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 		ErrorMessage: errMsg,
 	}
 
-	s.metrics.SendTransactionsCounter.Inc()
+	//s.metrics.SendTransactionsCounter.Inc()
 
 	return resp, nil
 }
