@@ -27,12 +27,13 @@ type lwdStreamer struct {
 	cache      *common.BlockCache
 	chainName  string
 	pingEnable bool
+	metrics    *common.PrometheusMetrics
 	walletrpc.UnimplementedCompactTxStreamerServer
 }
 
 // NewLwdStreamer constructs a gRPC context.
-func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool) (walletrpc.CompactTxStreamerServer, error) {
-	return &lwdStreamer{cache: cache, chainName: chainName, pingEnable: enablePing}, nil
+func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool, metrics *common.PrometheusMetrics) (walletrpc.CompactTxStreamerServer, error) {
+	return &lwdStreamer{cache: cache, chainName: chainName, pingEnable: enablePing, metrics: metrics}, nil
 }
 
 // DarksideStreamer holds the gRPC state for darksidewalletd.
@@ -57,14 +58,20 @@ func checkTaddress(taddr string) error {
 
 // GetLatestBlock returns the height of the best chain, according to zcashd.
 func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
-	latestBlock := s.cache.GetLatestHeight()
-
-	if latestBlock == -1 {
-		return nil, errors.New("Cache is empty. Server is probably not yet ready")
+	result, rpcErr := common.RawRequest("getblockchaininfo", []json.RawMessage{})
+	if rpcErr != nil {
+		return nil, rpcErr
+	}
+	var getblockchaininfoReply common.ZcashdRpcReplyGetblockchaininfo
+	err := json.Unmarshal(result, &getblockchaininfoReply)
+	if err != nil {
+		return nil, rpcErr
 	}
 
+	s.metrics.LatestBlockCounter.Inc()
+
 	// TODO: also return block hashes here
-	return &walletrpc.BlockID{Height: uint64(latestBlock)}, nil
+	return &walletrpc.BlockID{Height: uint64(getblockchaininfoReply.Blocks)}, nil
 }
 
 // GetTaddressTxids is a streaming RPC that returns transaction IDs that have
@@ -143,6 +150,7 @@ func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 		return nil, err
 	}
 
+	s.metrics.TotalBlocksServedConter.Inc()
 	return cBlock, err
 }
 
@@ -165,6 +173,7 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 			//s.metrics.TotalErrors.Inc()
 			return err
 		case cBlock := <-blockChan:
+			s.metrics.TotalBlocksServedConter.Inc()
 			err := resp.Send(cBlock)
 			if err != nil {
 				return err
@@ -330,7 +339,7 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 		ErrorMessage: errMsg,
 	}
 
-	//s.metrics.SendTransactionsCounter.Inc()
+	s.metrics.SendTransactionsCounter.Inc()
 
 	return resp, nil
 }

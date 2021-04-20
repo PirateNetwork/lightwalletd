@@ -14,6 +14,7 @@ import (
 	"github.com/btcsuite/btcd/rpcclient"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -27,6 +28,12 @@ import (
 	"github.com/adityapk00/lightwalletd/frontend"
 	"github.com/adityapk00/lightwalletd/walletrpc"
 )
+
+var (
+	promRegistry = prometheus.NewRegistry()
+)
+
+var metrics = common.GetPrometheusMetrics()
 
 var cfgFile string
 var logger = logrus.New()
@@ -114,6 +121,13 @@ func startServer(opts *common.Options) error {
 		logger.SetOutput(output)
 		logger.SetFormatter(&logrus.JSONFormatter{})
 	}
+
+	promRegistry.MustRegister(metrics.LatestBlockCounter)
+	promRegistry.MustRegister(metrics.TotalErrors)
+	promRegistry.MustRegister(metrics.TotalBlocksServedConter)
+	promRegistry.MustRegister(metrics.SendTransactionsCounter)
+	promRegistry.MustRegister(metrics.TotalSaplingParamsCounter)
+	promRegistry.MustRegister(metrics.TotalSproutParamsCounter)
 
 	logger.SetLevel(logrus.Level(opts.LogLevel))
 
@@ -249,7 +263,7 @@ func startServer(opts *common.Options) error {
 
 	// Compact transaction service initialization
 	{
-		service, err := frontend.NewLwdStreamer(cache, chainName, opts.PingEnable)
+		service, err := frontend.NewLwdStreamer(cache, chainName, opts.PingEnable, metrics)
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
@@ -411,6 +425,9 @@ func initConfig() {
 }
 
 func startHTTPServer(opts *common.Options) {
-	http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/metrics", promhttp.HandlerFor(
+		promRegistry,
+		promhttp.HandlerOpts{},
+	))
 	http.ListenAndServe(opts.HTTPBindAddr, nil)
 }
