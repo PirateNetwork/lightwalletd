@@ -195,9 +195,9 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 		saplingHeight = saplingJSON.ActivationHeight
 	}
 
-	vendor := "ECC LightWalletD"
+	vendor := "Zecwallet LightWalletD"
 	if DarksideEnabled {
-		vendor = "ECC DarksideWalletD"
+		vendor = "Zecwallet DarksideWalletD"
 	}
 	return &walletrpc.LightdInfo{
 		Version:                 Version,
