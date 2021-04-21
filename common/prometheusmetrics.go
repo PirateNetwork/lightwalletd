@@ -13,6 +13,11 @@ type PrometheusMetrics struct {
 }
 
 func GetPrometheusMetrics() *PrometheusMetrics {
+	if Metrics != nil {
+		return Metrics
+	}
+
+	// Create the metrics container
 	m := &PrometheusMetrics{}
 	m.LatestBlockCounter = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "lightwalletd_get_latest_block",

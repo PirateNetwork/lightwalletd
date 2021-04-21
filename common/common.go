@@ -61,6 +61,9 @@ var Sleep func(d time.Duration)
 // Log as a global variable simplifies logging
 var Log *logrus.Entry
 
+// Metrics as a global object to simplify things
+var Metrics *PrometheusMetrics
+
 // The following are JSON zcashd rpc requests and replies.
 type (
 	// zcashd rpc "getblockchaininfo"

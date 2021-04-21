@@ -46,8 +46,8 @@ type lwdStreamer struct {
 }
 
 // NewLwdStreamer constructs a gRPC context.
-func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool, metrics *common.PrometheusMetrics) (walletrpc.CompactTxStreamerServer, error) {
-	return &lwdStreamer{cache: cache, chainName: chainName, pingEnable: enablePing, metrics: metrics, latencyCache: make(map[string]*latencyCacheEntry), latencyMutex: sync.RWMutex{}}, nil
+func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool) (walletrpc.CompactTxStreamerServer, error) {
+	return &lwdStreamer{cache: cache, chainName: chainName, pingEnable: enablePing, latencyCache: make(map[string]*latencyCacheEntry), latencyMutex: sync.RWMutex{}}, nil
 }
 
 // DarksideStreamer holds the gRPC state for darksidewalletd.

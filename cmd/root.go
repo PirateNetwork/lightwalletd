@@ -33,8 +33,6 @@ var (
 	promRegistry = prometheus.NewRegistry()
 )
 
-var metrics = common.GetPrometheusMetrics()
-
 var cfgFile string
 var logger = logrus.New()
 
@@ -122,12 +120,12 @@ func startServer(opts *common.Options) error {
 		logger.SetFormatter(&logrus.JSONFormatter{})
 	}
 
-	promRegistry.MustRegister(metrics.LatestBlockCounter)
-	promRegistry.MustRegister(metrics.TotalErrors)
-	promRegistry.MustRegister(metrics.TotalBlocksServedConter)
-	promRegistry.MustRegister(metrics.SendTransactionsCounter)
-	promRegistry.MustRegister(metrics.TotalSaplingParamsCounter)
-	promRegistry.MustRegister(metrics.TotalSproutParamsCounter)
+	promRegistry.MustRegister(common.Metrics.LatestBlockCounter)
+	promRegistry.MustRegister(common.Metrics.TotalErrors)
+	promRegistry.MustRegister(common.Metrics.TotalBlocksServedConter)
+	promRegistry.MustRegister(common.Metrics.SendTransactionsCounter)
+	promRegistry.MustRegister(common.Metrics.TotalSaplingParamsCounter)
+	promRegistry.MustRegister(common.Metrics.TotalSproutParamsCounter)
 
 	logger.SetLevel(logrus.Level(opts.LogLevel))
 
@@ -263,7 +261,7 @@ func startServer(opts *common.Options) error {
 
 	// Compact transaction service initialization
 	{
-		service, err := frontend.NewLwdStreamer(cache, chainName, opts.PingEnable, metrics)
+		service, err := frontend.NewLwdStreamer(cache, chainName, opts.PingEnable)
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
@@ -393,6 +391,9 @@ func init() {
 		"app": "lightwalletd",
 	})
 
+	// Metrics
+	common.Metrics = common.GetPrometheusMetrics()
+
 	logrus.RegisterExitHandler(onexit)
 
 	// Indirect function for test mocking (so unit tests can talk to stub functions)
@@ -429,5 +430,9 @@ func startHTTPServer(opts *common.Options) {
 		promRegistry,
 		promhttp.HandlerOpts{},
 	))
+
+	// Add the params download handler
+	http.HandleFunc("/params/", common.ParamsHandler)
+
 	http.ListenAndServe(opts.HTTPBindAddr, nil)
 }
