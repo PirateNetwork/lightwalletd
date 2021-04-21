@@ -39,7 +39,6 @@ type lwdStreamer struct {
 	cache      *common.BlockCache
 	chainName  string
 	pingEnable bool
-	metrics    *common.PrometheusMetrics
 	walletrpc.UnimplementedCompactTxStreamerServer
 	latencyCache map[string]*latencyCacheEntry
 	latencyMutex sync.RWMutex
@@ -110,7 +109,7 @@ func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 		return nil, rpcErr
 	}
 
-	s.metrics.LatestBlockCounter.Inc()
+	common.Metrics.LatestBlockCounter.Inc()
 
 	// TODO: also return block hashes here
 	return &walletrpc.BlockID{Height: uint64(getblockchaininfoReply.Blocks)}, nil
@@ -192,7 +191,7 @@ func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 		return nil, err
 	}
 
-	s.metrics.TotalBlocksServedConter.Inc()
+	common.Metrics.TotalBlocksServedConter.Inc()
 	return cBlock, err
 }
 
@@ -273,10 +272,10 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 		select {
 		case err := <-errChan:
 			// this will also catch context.DeadlineExceeded from the timeout
-			//s.metrics.TotalErrors.Inc()
+			//common.Metrics.TotalErrors.Inc()
 			return err
 		case cBlock := <-blockChan:
-			s.metrics.TotalBlocksServedConter.Inc()
+			common.Metrics.TotalBlocksServedConter.Inc()
 			err := resp.Send(cBlock)
 			if err != nil {
 				return err
@@ -442,7 +441,7 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 		ErrorMessage: errMsg,
 	}
 
-	s.metrics.SendTransactionsCounter.Inc()
+	common.Metrics.SendTransactionsCounter.Inc()
 
 	return resp, nil
 }
