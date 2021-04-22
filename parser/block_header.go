@@ -1,14 +1,18 @@
+// Copyright (c) 2019-2020 The Zcash developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
+
+// Package parser deserializes the block header from zcashd.
 package parser
 
 import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"log"
 	"math/big"
 
-	"github.com/pkg/errors"
 	"github.com/adityapk00/lightwalletd/parser/internal/bytestring"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -16,8 +20,9 @@ const (
 	equihashSizeMainnet             = 1344 // size of a mainnet / testnet Equihash solution in bytes
 )
 
-// A block header as defined in version 2018.0-beta-29 of the Zcash Protocol Spec.
-type rawBlockHeader struct {
+// RawBlockHeader implements the block header as defined in version
+// 2018.0-beta-29 of the Zcash Protocol Spec.
+type RawBlockHeader struct {
 	// The block version number indicates which set of block validation rules
 	// to follow. The current and only defined block version number for Zcash
 	// is 4.
@@ -56,14 +61,15 @@ type rawBlockHeader struct {
 	Solution []byte
 }
 
-type blockHeader struct {
-	*rawBlockHeader
-	cachedHash      []byte
-	targetThreshold *big.Int
+// BlockHeader extends RawBlockHeader by adding a cache for the block hash.
+type BlockHeader struct {
+	*RawBlockHeader
+	cachedHash []byte
 }
 
-func CompactLengthPrefixedLen(val []byte) int {
-	length := len(val)
+// CompactLengthPrefixedLen calculates the total number of bytes needed to
+// encode 'length' bytes.
+func CompactLengthPrefixedLen(length int) int {
 	if length < 253 {
 		return 1 + length
 	} else if length <= 0xffff {
@@ -75,33 +81,34 @@ func CompactLengthPrefixedLen(val []byte) int {
 	}
 }
 
-func WriteCompactLengthPrefixed(buf *bytes.Buffer, val []byte) error {
-	length := len(val)
+// WriteCompactLengthPrefixedLen writes the given length to the stream.
+func WriteCompactLengthPrefixedLen(buf *bytes.Buffer, length int) {
 	if length < 253 {
 		binary.Write(buf, binary.LittleEndian, uint8(length))
-		binary.Write(buf, binary.LittleEndian, val)
 	} else if length <= 0xffff {
 		binary.Write(buf, binary.LittleEndian, byte(253))
 		binary.Write(buf, binary.LittleEndian, uint16(length))
-		binary.Write(buf, binary.LittleEndian, val)
 	} else if length <= 0xffffffff {
 		binary.Write(buf, binary.LittleEndian, byte(254))
 		binary.Write(buf, binary.LittleEndian, uint32(length))
-		binary.Write(buf, binary.LittleEndian, val)
 	} else {
 		binary.Write(buf, binary.LittleEndian, byte(255))
 		binary.Write(buf, binary.LittleEndian, uint64(length))
-		binary.Write(buf, binary.LittleEndian, val)
 	}
-	return nil
 }
 
-func (hdr *rawBlockHeader) GetSize() int {
-	return serBlockHeaderMinusEquihashSize + CompactLengthPrefixedLen(hdr.Solution)
+func writeCompactLengthPrefixed(buf *bytes.Buffer, val []byte) {
+	WriteCompactLengthPrefixedLen(buf, len(val))
+	binary.Write(buf, binary.LittleEndian, val)
 }
 
-func (hdr *rawBlockHeader) MarshalBinary() ([]byte, error) {
-	headerSize := hdr.GetSize()
+func (hdr *RawBlockHeader) getSize() int {
+	return serBlockHeaderMinusEquihashSize + CompactLengthPrefixedLen(len(hdr.Solution))
+}
+
+// MarshalBinary returns the block header in serialized form
+func (hdr *RawBlockHeader) MarshalBinary() ([]byte, error) {
+	headerSize := hdr.getSize()
 	backing := make([]byte, 0, headerSize)
 	buf := bytes.NewBuffer(backing)
 	binary.Write(buf, binary.LittleEndian, hdr.Version)
@@ -111,53 +118,54 @@ func (hdr *rawBlockHeader) MarshalBinary() ([]byte, error) {
 	binary.Write(buf, binary.LittleEndian, hdr.Time)
 	binary.Write(buf, binary.LittleEndian, hdr.NBitsBytes)
 	binary.Write(buf, binary.LittleEndian, hdr.Nonce)
-	WriteCompactLengthPrefixed(buf, hdr.Solution)
+	writeCompactLengthPrefixed(buf, hdr.Solution)
 	return backing[:headerSize], nil
 }
 
-func NewBlockHeader() *blockHeader {
-	return &blockHeader{
-		rawBlockHeader: new(rawBlockHeader),
+// NewBlockHeader return a pointer to a new block header instance.
+func NewBlockHeader() *BlockHeader {
+	return &BlockHeader{
+		RawBlockHeader: new(RawBlockHeader),
 	}
 }
 
 // ParseFromSlice parses the block header struct from the provided byte slice,
 // advancing over the bytes read. If successful it returns the rest of the
 // slice, otherwise it returns the input slice unaltered along with an error.
-func (hdr *blockHeader) ParseFromSlice(in []byte) (rest []byte, err error) {
+func (hdr *BlockHeader) ParseFromSlice(in []byte) (rest []byte, err error) {
 	s := bytestring.String(in)
 
 	// Primary parsing layer: sort the bytes into things
 
-	if ok := s.ReadInt32(&hdr.Version); !ok {
+	if !s.ReadInt32(&hdr.Version) {
 		return in, errors.New("could not read header version")
 	}
 
-	if ok := s.ReadBytes(&hdr.HashPrevBlock, 32); !ok {
+	if !s.ReadBytes(&hdr.HashPrevBlock, 32) {
 		return in, errors.New("could not read HashPrevBlock")
 	}
 
-	if ok := s.ReadBytes(&hdr.HashMerkleRoot, 32); !ok {
+	if !s.ReadBytes(&hdr.HashMerkleRoot, 32) {
 		return in, errors.New("could not read HashMerkleRoot")
 	}
 
-	if ok := s.ReadBytes(&hdr.HashFinalSaplingRoot, 32); !ok {
+	if !s.ReadBytes(&hdr.HashFinalSaplingRoot, 32) {
 		return in, errors.New("could not read HashFinalSaplingRoot")
 	}
 
-	if ok := s.ReadUint32(&hdr.Time); !ok {
+	if !s.ReadUint32(&hdr.Time) {
 		return in, errors.New("could not read timestamp")
 	}
 
-	if ok := s.ReadBytes(&hdr.NBitsBytes, 4); !ok {
+	if !s.ReadBytes(&hdr.NBitsBytes, 4) {
 		return in, errors.New("could not read NBits bytes")
 	}
 
-	if ok := s.ReadBytes(&hdr.Nonce, 32); !ok {
+	if !s.ReadBytes(&hdr.Nonce, 32) {
 		return in, errors.New("could not read Nonce bytes")
 	}
 
-	if ok := s.ReadCompactLengthPrefixed((*bytestring.String)(&hdr.Solution)); !ok {
+	if !s.ReadCompactLengthPrefixed((*bytestring.String)(&hdr.Solution)) {
 		return in, errors.New("could not read CompactSize-prefixed Equihash solution")
 	}
 
@@ -187,14 +195,13 @@ func parseNBits(b []byte) *big.Int {
 }
 
 // GetDisplayHash returns the bytes of a block hash in big-endian order.
-func (hdr *blockHeader) GetDisplayHash() []byte {
+func (hdr *BlockHeader) GetDisplayHash() []byte {
 	if hdr.cachedHash != nil {
 		return hdr.cachedHash
 	}
 
 	serializedHeader, err := hdr.MarshalBinary()
 	if err != nil {
-		log.Fatalf("error marshaling block header: %v", err)
 		return nil
 	}
 
@@ -202,22 +209,16 @@ func (hdr *blockHeader) GetDisplayHash() []byte {
 	digest := sha256.Sum256(serializedHeader)
 	digest = sha256.Sum256(digest[:])
 
-	// Reverse byte order
-	for i := 0; i < len(digest)/2; i++ {
-		j := len(digest) - 1 - i
-		digest[i], digest[j] = digest[j], digest[i]
-	}
-
-	hdr.cachedHash = digest[:]
+	// Convert to big-endian
+	hdr.cachedHash = Reverse(digest[:])
 	return hdr.cachedHash
 }
 
 // GetEncodableHash returns the bytes of a block hash in little-endian wire order.
-func (hdr *blockHeader) GetEncodableHash() []byte {
+func (hdr *BlockHeader) GetEncodableHash() []byte {
 	serializedHeader, err := hdr.MarshalBinary()
 
 	if err != nil {
-		log.Fatalf("error marshaling block header: %v", err)
 		return nil
 	}
 
@@ -226,4 +227,9 @@ func (hdr *blockHeader) GetEncodableHash() []byte {
 	digest = sha256.Sum256(digest[:])
 
 	return digest[:]
+}
+
+// GetDisplayPrevHash returns the block hash in big-endian order.
+func (hdr *BlockHeader) GetDisplayPrevHash() []byte {
+	return Reverse(hdr.HashPrevBlock)
 }

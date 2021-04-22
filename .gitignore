@@ -1,6 +1,11 @@
-main
-grpcfrontend*
-cert.pem
-key.pem
+first-make-timestamp
+lightwalletd
+lightwalletd.exe
+server.log
+db/
+coverage.out
+test-log
+lwd-api.html
+*.orig
+__debug_bin
 .vscode
-lightwalletd.log
