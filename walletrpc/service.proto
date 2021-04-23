@@ -32,17 +32,10 @@ message TxFilter {
 }
 
 // RawTransaction contains the complete transaction data. It also optionally includes 
-<<<<<<< HEAD
-// the block height in which the transaction was included
-message RawTransaction {
-    bytes data = 1;
-    uint64 height = 2;
-=======
 // the block height in which the transaction was included.
 message RawTransaction {
     bytes data = 1;     // exact data returned by Zcash 'getrawtransaction'
     uint64 height = 2;  // height that the transaction was mined (or -1)
->>>>>>> dcad72ed2556acd16eb8f5c03c6a25bee38e64ea
 }
 
 // A SendResponse encodes an error code and a string. It is currently used
@@ -56,31 +49,6 @@ message SendResponse {
 // Chainspec is a placeholder to allow specification of a particular chain fork.
 message ChainSpec {}
 
-<<<<<<< HEAD
-message Empty {}
-
-message LightdInfo {
-    string version = 1;
-    string vendor = 2;
-    bool   taddrSupport = 3;
-    string chainName = 4;
-    uint64 saplingActivationHeight = 5;
-    string consensusBranchId = 6;   // This should really be u32 or []byte, but string for readability
-    uint64 blockHeight = 7;
-}
-
-message TransparentAddress {
-    string address = 1;
-}
-
-message TransparentAddressBlockFilter {
-    string address = 1;
-    BlockRange range = 2;
-}
-
-service CompactTxStreamer {
-    // Compact Blocks
-=======
 // Empty is for gRPCs that take no arguments, currently only GetLightdInfo.
 message Empty {}
 
@@ -169,29 +137,17 @@ message GetAddressUtxosReplyList {
 
 service CompactTxStreamer {
     // Return the height of the tip of the best chain
->>>>>>> dcad72ed2556acd16eb8f5c03c6a25bee38e64ea
     rpc GetLatestBlock(ChainSpec) returns (BlockID) {}
     // Return the compact block corresponding to the given block identifier
     rpc GetBlock(BlockID) returns (CompactBlock) {}
     // Return a list of consecutive compact blocks
     rpc GetBlockRange(BlockRange) returns (stream CompactBlock) {}
 
-<<<<<<< HEAD
-    // Transactions
-=======
     // Return the requested full (not compact) transaction (as from zcashd)
->>>>>>> dcad72ed2556acd16eb8f5c03c6a25bee38e64ea
     rpc GetTransaction(TxFilter) returns (RawTransaction) {}
     // Submit the given transaction to the Zcash network
     rpc SendTransaction(RawTransaction) returns (SendResponse) {}
 
-<<<<<<< HEAD
-    // t-Address support
-    rpc GetAddressTxids(TransparentAddressBlockFilter) returns (stream RawTransaction) {}
-
-    // Misc
-    rpc GetLightdInfo(Empty) returns (LightdInfo) {}
-=======
     // Return the txids corresponding to the given t-address within the given block range
     rpc GetTaddressTxids(TransparentAddressBlockFilter) returns (stream RawTransaction) {}
     rpc GetTaddressBalance(AddressList) returns (Balance) {}
@@ -221,5 +177,4 @@ service CompactTxStreamer {
     rpc GetLightdInfo(Empty) returns (LightdInfo) {}
     // Testing-only, requires lightwalletd --ping-very-insecure (do not enable in production)
     rpc Ping(Duration) returns (PingResponse) {}
->>>>>>> dcad72ed2556acd16eb8f5c03c6a25bee38e64ea
 }
