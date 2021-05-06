@@ -74,7 +74,7 @@ var rootCmd = &cobra.Command{
 			os.OpenFile(opts.LogFile, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 		}
 		if !opts.Darkside && (opts.RPCUser == "" || opts.RPCPassword == "" || opts.RPCHost == "" || opts.RPCPort == "") {
-			filesThatShouldExist = append(filesThatShouldExist, opts.ZcashConfPath)
+			filesThatShouldExist = append(filesThatShouldExist, opts.PirateConfPath)
 		}
 		if !opts.NoTLSVeryInsecure && !opts.GenCertVeryInsecure {
 			filesThatShouldExist = append(filesThatShouldExist,
@@ -203,7 +203,7 @@ func startServer(opts *common.Options) error {
 		if opts.RPCUser != "" && opts.RPCPassword != "" && opts.RPCHost != "" && opts.RPCPort != "" {
 			rpcClient, err = frontend.NewZRPCFromFlags(opts)
 		} else {
-			rpcClient, err = frontend.NewZRPCFromConf(opts.ZcashConfPath)
+			rpcClient, err = frontend.NewZRPCFromConf(opts.PirateConfPath)
 		}
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
@@ -336,10 +336,10 @@ func init() {
 	rootCmd.Flags().String("rpcport", "", "RPC host port")
 	rootCmd.Flags().Bool("no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("gen-cert-very-insecure", false, "run with self-signed TLS certificate, only for debugging, DO NOT use in production")
-	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zcashd; reinitialize local cache files")
+	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from pirated; reinitialize local cache files")
 	rootCmd.Flags().String("data-dir", "/var/lib/lightwalletd", "data directory (such as db)")
 	rootCmd.Flags().Bool("ping-very-insecure", false, "allow Ping GRPC for testing")
-	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zcashd for integration testing (shuts down after 30 minutes)")
+	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock pirated for integration testing (shuts down after 30 minutes)")
 	rootCmd.Flags().Int("darkside-timeout", 30, "override 30 minute default darkside timeout")
 
 	viper.BindPFlag("grpc-bind-addr", rootCmd.Flags().Lookup("grpc-bind-addr"))
