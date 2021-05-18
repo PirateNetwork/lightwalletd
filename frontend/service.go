@@ -97,6 +97,46 @@ func (s *lwdStreamer) dailyActiveBlock(height uint64, peerip string) {
 	}
 }
 
+func (s *lwdStreamer) GetZECPrice(ctx context.Context, in *walletrpc.PriceRequest) (*walletrpc.PriceResponse, error) {
+	// Check for prices before zcash was born
+	if in == nil || in.Timestamp <= 1477551600 /* Zcash birthday: 2016-10-28*/ {
+		common.Metrics.ZecPriceHistoryErrors.Inc()
+		return nil, errors.New("incorrect Timestamp")
+	}
+
+	if in.Currency != "USD" {
+		common.Metrics.ZecPriceHistoryErrors.Inc()
+		return nil, errors.New("unsupported currency")
+	}
+
+	ts := time.Unix(int64(in.Timestamp), 0)
+	price, timeFetched, err := common.GetHistoricalPrice(&ts)
+
+	if err != nil {
+		common.Metrics.ZecPriceHistoryErrors.Inc()
+		return nil, err
+	}
+
+	return &walletrpc.PriceResponse{Timestamp: timeFetched.Unix(), Price: price, Currency: "USD"}, nil
+}
+
+func (s *lwdStreamer) GetCurrentZECPrice(ctx context.Context, in *walletrpc.Empty) (*walletrpc.PriceResponse, error) {
+	price, err := common.GetCurrentPrice()
+	if err != nil {
+		common.Metrics.ZecPriceGauge.Set(0)
+		return nil, err
+	}
+
+	if price <= 0 {
+		common.Metrics.ZecPriceGauge.Set(0)
+		return nil, errors.New("no price available")
+	}
+
+	resp := &walletrpc.PriceResponse{Timestamp: time.Now().Unix(), Currency: "USD", Price: price}
+	common.Metrics.ZecPriceGauge.Set(price)
+	return resp, nil
+}
+
 // GetLatestBlock returns the height of the best chain, according to zcashd.
 func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
 	result, rpcErr := common.RawRequest("getblockchaininfo", []json.RawMessage{})

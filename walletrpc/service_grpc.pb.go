@@ -24,6 +24,9 @@ type CompactTxStreamerClient interface {
 	GetBlock(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*CompactBlock, error)
 	// Return a list of consecutive compact blocks
 	GetBlockRange(ctx context.Context, in *BlockRange, opts ...grpc.CallOption) (CompactTxStreamer_GetBlockRangeClient, error)
+	// Get the historical and current prices
+	GetZECPrice(ctx context.Context, in *PriceRequest, opts ...grpc.CallOption) (*PriceResponse, error)
+	GetCurrentZECPrice(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PriceResponse, error)
 	// Return the requested full (not compact) transaction (as from zcashd)
 	GetTransaction(ctx context.Context, in *TxFilter, opts ...grpc.CallOption) (*RawTransaction, error)
 	// Submit the given transaction to the Zcash network
@@ -111,6 +114,24 @@ func (x *compactTxStreamerGetBlockRangeClient) Recv() (*CompactBlock, error) {
 		return nil, err
 	}
 	return m, nil
+}
+
+func (c *compactTxStreamerClient) GetZECPrice(ctx context.Context, in *PriceRequest, opts ...grpc.CallOption) (*PriceResponse, error) {
+	out := new(PriceResponse)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetZECPrice", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *compactTxStreamerClient) GetCurrentZECPrice(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PriceResponse, error) {
+	out := new(PriceResponse)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetCurrentZECPrice", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *compactTxStreamerClient) GetTransaction(ctx context.Context, in *TxFilter, opts ...grpc.CallOption) (*RawTransaction, error) {
@@ -316,6 +337,9 @@ type CompactTxStreamerServer interface {
 	GetBlock(context.Context, *BlockID) (*CompactBlock, error)
 	// Return a list of consecutive compact blocks
 	GetBlockRange(*BlockRange, CompactTxStreamer_GetBlockRangeServer) error
+	// Get the historical and current prices
+	GetZECPrice(context.Context, *PriceRequest) (*PriceResponse, error)
+	GetCurrentZECPrice(context.Context, *Empty) (*PriceResponse, error)
 	// Return the requested full (not compact) transaction (as from zcashd)
 	GetTransaction(context.Context, *TxFilter) (*RawTransaction, error)
 	// Submit the given transaction to the Zcash network
@@ -360,6 +384,12 @@ func (UnimplementedCompactTxStreamerServer) GetBlock(context.Context, *BlockID) 
 }
 func (UnimplementedCompactTxStreamerServer) GetBlockRange(*BlockRange, CompactTxStreamer_GetBlockRangeServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetBlockRange not implemented")
+}
+func (UnimplementedCompactTxStreamerServer) GetZECPrice(context.Context, *PriceRequest) (*PriceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetZECPrice not implemented")
+}
+func (UnimplementedCompactTxStreamerServer) GetCurrentZECPrice(context.Context, *Empty) (*PriceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCurrentZECPrice not implemented")
 }
 func (UnimplementedCompactTxStreamerServer) GetTransaction(context.Context, *TxFilter) (*RawTransaction, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTransaction not implemented")
@@ -462,6 +492,42 @@ type compactTxStreamerGetBlockRangeServer struct {
 
 func (x *compactTxStreamerGetBlockRangeServer) Send(m *CompactBlock) error {
 	return x.ServerStream.SendMsg(m)
+}
+
+func _CompactTxStreamer_GetZECPrice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PriceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CompactTxStreamerServer).GetZECPrice(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetZECPrice",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CompactTxStreamerServer).GetZECPrice(ctx, req.(*PriceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CompactTxStreamer_GetCurrentZECPrice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CompactTxStreamerServer).GetCurrentZECPrice(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetCurrentZECPrice",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CompactTxStreamerServer).GetCurrentZECPrice(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _CompactTxStreamer_GetTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -693,6 +759,14 @@ var CompactTxStreamer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBlock",
 			Handler:    _CompactTxStreamer_GetBlock_Handler,
+		},
+		{
+			MethodName: "GetZECPrice",
+			Handler:    _CompactTxStreamer_GetZECPrice_Handler,
+		},
+		{
+			MethodName: "GetCurrentZECPrice",
+			Handler:    _CompactTxStreamer_GetCurrentZECPrice_Handler,
 		},
 		{
 			MethodName: "GetTransaction",
