@@ -622,6 +622,27 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 	return nil
 }
 
+func (s *lwdStreamer) GetMempoolStream(_empty *walletrpc.Empty, resp walletrpc.CompactTxStreamer_GetMempoolStreamServer) error {
+	ch := make(chan *walletrpc.RawTransaction, 200)
+	go common.AddNewClient(ch)
+
+	for {
+		select {
+		case rtx, more := <-ch:
+			if !more || rtx == nil {
+				return nil
+			}
+
+			if resp.Send(rtx) != nil {
+				return nil
+			}
+		// Timeout after 5 mins
+		case <-time.After(5 * time.Minute):
+			return nil
+		}
+	}
+}
+
 // Return the subset of items that aren't excluded, but
 // if more than one item matches an exclude entry, return
 // all those items.

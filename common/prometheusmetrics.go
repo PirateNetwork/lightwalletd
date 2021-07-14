@@ -10,6 +10,7 @@ type PrometheusMetrics struct {
 	TotalErrors                  prometheus.Counter
 	TotalSaplingParamsCounter    prometheus.Counter
 	TotalSproutParamsCounter     prometheus.Counter
+	MempoolClientsGauge          prometheus.Gauge
 	ZecPriceGauge                prometheus.Gauge
 	ZecPriceHistoryWebAPICounter prometheus.Counter
 	ZecPriceHistoryErrors        prometheus.Counter
@@ -50,6 +51,11 @@ func GetPrometheusMetrics() *PrometheusMetrics {
 	m.TotalSproutParamsCounter = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "params_sprout_total",
 		Help: "Total number of params downloasd for sprout params",
+	})
+
+	m.MempoolClientsGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "mempool_clients",
+		Help: "Number of concurrent mempool clients",
 	})
 
 	m.ZecPriceGauge = prometheus.NewGauge(prometheus.GaugeOpts{

@@ -126,6 +126,7 @@ func startServer(opts *common.Options) error {
 	promRegistry.MustRegister(common.Metrics.SendTransactionsCounter)
 	promRegistry.MustRegister(common.Metrics.TotalSaplingParamsCounter)
 	promRegistry.MustRegister(common.Metrics.TotalSproutParamsCounter)
+	promRegistry.MustRegister(common.Metrics.MempoolClientsGauge)
 	promRegistry.MustRegister(common.Metrics.ZecPriceGauge)
 	promRegistry.MustRegister(common.Metrics.ZecPriceHistoryWebAPICounter)
 	promRegistry.MustRegister(common.Metrics.ZecPriceHistoryErrors)
@@ -285,6 +286,10 @@ func startServer(opts *common.Options) error {
 	// Initialize price fetcher
 	common.StartPriceFetcher(dbPath, chainName)
 
+	// Initialize mempool monitor
+	exitMempool := make(chan bool)
+	common.StartMempoolMonitor(cache, exitMempool)
+
 	// Start listening
 	listener, err := net.Listen("tcp", opts.GRPCBindAddr)
 	if err != nil {
@@ -303,6 +308,8 @@ func startServer(opts *common.Options) error {
 		common.Log.WithFields(logrus.Fields{
 			"signal": s.String(),
 		}).Info("caught signal, stopping gRPC server")
+
+		exitMempool <- true
 		os.Exit(1)
 	}()
 
