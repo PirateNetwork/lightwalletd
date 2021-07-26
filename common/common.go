@@ -217,6 +217,24 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 	}, nil
 }
 
+func getBestBlockHash() ([]byte, error) {
+	result, rpcErr := RawRequest("getbestblockhash", []json.RawMessage{})
+	if rpcErr != nil {
+		return nil, rpcErr
+	}
+	var hash string
+	err := json.Unmarshal(result, &hash)
+	if err != nil {
+		return nil, err
+	}
+	hashbytes, err := hex.DecodeString(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	return parser.Reverse(hashbytes), nil
+}
+
 func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	params := make([]json.RawMessage, 2)
 	heightJSON, err := json.Marshal(strconv.Itoa(height))
@@ -328,6 +346,28 @@ func BlockIngestor(c *BlockCache, rep int) {
 				Sleep(20 * time.Second)
 				continue
 			}
+
+			// Check the current top block to see if there's a hash mismatch (i.e., a 1-block reorg)
+			curhash, err := getBestBlockHash()
+			if err != nil {
+				Log.WithFields(logrus.Fields{
+					"height": height,
+					"error":  err,
+				}).Warn("error zcashd getblock rpc")
+				continue
+			}
+			if c.HashMismatch(curhash) {
+				// Current block has a hash mismatch
+				Log.WithFields(logrus.Fields{
+					"height": height - 1,
+					"hash":   displayHash(curhash),
+					"phash":  displayHash(c.GetLatestHash()),
+					"reorg":  reorgCount,
+				}).Warn("REORG/Current Block")
+				c.Reorg(height - 1)
+				continue
+			}
+
 			if wait {
 				// Wait a bit then retry the same height.
 				c.Sync()
@@ -376,7 +416,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 			Log.Fatal("Cache add failed:", err)
 		}
 		// Don't log these too often.
-		if time.Now().Sub(lastLog).Seconds() >= 4 && c.GetNextHeight() == height+1 && height != lastHeightLogged {
+		if time.Since(lastLog).Seconds() >= 4 && c.GetNextHeight() == height+1 && height != lastHeightLogged {
 			lastLog = time.Now()
 			lastHeightLogged = height
 			Log.Info("Ingestor adding block to cache: ", height)

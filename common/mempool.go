@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"sync"
@@ -17,8 +18,8 @@ var (
 	// List of all clients waiting to recieve mempool txns
 	clients []chan<- *walletrpc.RawTransaction
 
-	// Last height of the blocks. If this changes, then close all the clients and flush the mempool
-	lastHeight int
+	// Latest hash of the blocks. If this changes, then close all the clients and flush the mempool
+	lastHash []byte
 
 	// A pointer to the blockcache
 	blockcache *BlockCache
@@ -52,7 +53,7 @@ func AddNewClient(client chan<- *walletrpc.RawTransaction) {
 
 // RefreshMempoolTxns gets all new mempool txns and sends any new ones to waiting clients
 func refreshMempoolTxns() error {
-	Log.Infoln("Refreshing mempool")
+	//Log.Infoln("Refreshing mempool")
 
 	// First check if another refresh is running, if it is, just return
 	if !atomic.CompareAndSwapInt32(&refreshing, 0, 1) {
@@ -70,8 +71,8 @@ func refreshMempoolTxns() error {
 	lock.Lock()
 	defer lock.Unlock()
 
-	if lastHeight < blockcache.GetLatestHeight() {
-		Log.Infoln("Block height changed, clearing everything")
+	if !bytes.Equal(lastHash, blockcache.GetLatestHash()) {
+		Log.Infoln("Block hash changed, clearing mempool clients")
 
 		// Flush all the clients
 		for _, client := range clients {
@@ -85,7 +86,7 @@ func refreshMempoolTxns() error {
 		// Clear txns
 		txns = make(map[string]*walletrpc.RawTransaction)
 
-		lastHeight = blockcache.GetLatestHeight()
+		lastHash = blockcache.GetLatestHash()
 	}
 
 	var mempoolList []string
@@ -131,7 +132,7 @@ func refreshMempoolTxns() error {
 
 			newRtx := &walletrpc.RawTransaction{
 				Data:   txBytes,
-				Height: uint64(lastHeight),
+				Height: uint64(blockcache.GetLatestHeight()),
 			}
 
 			// Notify waiting clients
@@ -154,7 +155,7 @@ func StartMempoolMonitor(cache *BlockCache, done <-chan bool) {
 	go func() {
 		ticker := time.NewTicker(2 * time.Second)
 		blockcache = cache
-		lastHeight = blockcache.GetLatestHeight()
+		lastHash = blockcache.GetLatestHash()
 
 		for {
 			select {
