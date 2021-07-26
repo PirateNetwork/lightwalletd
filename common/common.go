@@ -80,6 +80,7 @@ type (
 		Chain           string
 		Upgrades        map[string]Upgradeinfo
 		Blocks          int
+		BestBlockHash   string
 		Consensus       ConsensusInfo
 		EstimatedHeight int
 	}

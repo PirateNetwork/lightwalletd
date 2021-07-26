@@ -146,13 +146,16 @@ func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 	var getblockchaininfoReply common.ZcashdRpcReplyGetblockchaininfo
 	err := json.Unmarshal(result, &getblockchaininfoReply)
 	if err != nil {
-		return nil, rpcErr
+		return nil, err
+	}
+
+	hash, err := hex.DecodeString(getblockchaininfoReply.BestBlockHash)
+	if err != nil {
+		return nil, err
 	}
 
 	common.Metrics.LatestBlockCounter.Inc()
-
-	// TODO: also return block hashes here
-	return &walletrpc.BlockID{Height: uint64(getblockchaininfoReply.Blocks)}, nil
+	return &walletrpc.BlockID{Height: uint64(getblockchaininfoReply.Blocks), Hash: parser.Reverse(hash)}, nil
 }
 
 // GetTaddressTxids is a streaming RPC that returns transaction IDs that have
