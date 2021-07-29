@@ -295,30 +295,29 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 		}
 	}()
 
-	// Log a daily active user if the user requests the day's "key block"
+	// Logging and metrics
 	go func() {
+		// Log a daily active user if the user requests the day's "key block"
 		for height := span.Start.Height; height <= span.End.Height; height++ {
 			s.dailyActiveBlock(height, peerip)
 		}
-	}()
 
-	common.Log.WithFields(logrus.Fields{
-		"method":    "GetBlockRange",
-		"start":     span.Start.Height,
-		"end":       span.End.Height,
-		"peer_addr": peerip,
-	}).Info("Service")
+		common.Log.WithFields(logrus.Fields{
+			"method":    "GetBlockRange",
+			"start":     span.Start.Height,
+			"end":       span.End.Height,
+			"peer_addr": peerip,
+		}).Info("Service")
+		common.Metrics.TotalBlocksServedConter.Add(math.Abs(float64(span.Start.Height) - float64(span.End.Height)))
+	}()
 
 	go common.GetBlockRange(s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
 
 	for {
 		select {
 		case err := <-errChan:
-			// this will also catch context.DeadlineExceeded from the timeout
-			//common.Metrics.TotalErrors.Inc()
 			return err
 		case cBlock := <-blockChan:
-			common.Metrics.TotalBlocksServedConter.Inc()
 			err := resp.Send(cBlock)
 			if err != nil {
 				return err
