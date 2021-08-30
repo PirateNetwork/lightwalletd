@@ -88,11 +88,32 @@ func fetchBinancePrice() (float64, error) {
 	return fetchAPIPrice("https://api.binance.com/api/v3/avgPrice?symbol=ZECUSDC", []string{"price"})
 }
 
-func fetchHistoricalCoingeckoPrice(ts *time.Time) (float64, error) {
-	dt := ts.Format("02-01-2006") // dd-mm-yyyy
-	url := fmt.Sprintf("https://api.coingecko.com/api/v3/coins/zcash/history?date=%s?id=zcash", dt)
+func fetchHistoricalCoinbasePrice(ts *time.Time) (float64, error) {
+	dt := ts.Format("2006-01-02") // ISO 8601
+	url := fmt.Sprintf("https://api.pro.coinbase.com/products/ZEC-USDC/candles?start=%sT00:00:00&end=%sT00:00:00&granularity=86400", dt, dt)
 
-	return fetchAPIPrice(url, []string{"market_data", "current_price", "usd"})
+	resp, err := http.Get(url)
+	if err != nil {
+		return -1, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return -1, err
+	}
+
+	var prices [][]float64
+	err = json.Unmarshal(body, &prices)
+	if err != nil {
+		return -1, err
+	}
+
+	if len(prices) == 0 || len(prices[0]) < 5 {
+		return -1, nil
+	}
+
+	return prices[0][4], nil
 }
 
 // Median gets the median number in a slice of numbers
@@ -309,7 +330,7 @@ func GetHistoricalPrice(ts *time.Time) (float64, *time.Time, error) {
 	}
 
 	// Fetch price from web API
-	price, err := fetchHistoricalCoingeckoPrice(ts)
+	price, err := fetchHistoricalCoinbasePrice(ts)
 	if err != nil {
 		Log.Errorf("Couldn't read historical prices from Coingecko: %v", err)
 		return -1, nil, err
