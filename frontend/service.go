@@ -201,6 +201,8 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 	timeout, cancel := context.WithTimeout(resp.Context(), 30*time.Second)
 	defer cancel()
 
+	var prevHeight = 0
+	txCache := make([]*walletrpc.RawTransaction, 0)
 	for _, txidstr := range txids {
 		txid, _ := hex.DecodeString(txidstr)
 		// Txid is read as a string, which is in big-endian order. But when converting
@@ -209,7 +211,25 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 		if err != nil {
 			return err
 		}
-		if err = resp.Send(tx); err != nil {
+
+		if tx.Height > uint64(prevHeight) {
+			for _, txi := range txCache {
+				if err = resp.Send(txi); err != nil {
+					return err
+				}
+			}
+			txCache = make([]*walletrpc.RawTransaction, 0)
+			prevHeight = int(tx.Height)
+		}
+
+		if tx.Height == uint64(prevHeight) {
+			txCache = append(txCache, tx)
+		}
+
+	}
+
+	for _, txi := range txCache {
+		if err = resp.Send(txi); err != nil {
 			return err
 		}
 	}

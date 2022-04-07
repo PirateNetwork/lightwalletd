@@ -63,7 +63,7 @@ func refreshMempoolTxns() error {
 
 	// Set refreshing to 0 when we exit
 	defer func() {
-		refreshing = 0
+		atomic.StoreInt32(&refreshing, 0)
 	}()
 
 	// Check if the blockchain has changed, and if it has, then clear everything
