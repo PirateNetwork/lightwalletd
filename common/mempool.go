@@ -153,7 +153,7 @@ func refreshMempoolTxns() error {
 // StartMempoolMonitor starts monitoring the mempool
 func StartMempoolMonitor(cache *BlockCache, done <-chan bool) {
 	go func() {
-		ticker := time.NewTicker(2 * time.Second)
+		ticker := time.NewTicker(4 * time.Second)
 		blockcache = cache
 		lastHash = blockcache.GetLatestHash()
 
