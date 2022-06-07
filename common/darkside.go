@@ -46,6 +46,9 @@ type darksideState struct {
 	// These transactions come from StageTransactions(); they will be merged into
 	// activeBlocks by ApplyStaged() (and this list then cleared).
 	stagedTransactions []stagedTx
+
+	// Unordered list of replies
+	getAddressUtxos []ZcashdRpcReplyGetaddressutxos
 }
 
 var state darksideState
@@ -74,7 +77,7 @@ func DarksideInit(c *BlockCache, timeout int) {
 // DarksideReset allows the wallet test code to specify values
 // that are returned by GetLightdInfo().
 func DarksideReset(sa int, bi, cn string) error {
-	Log.Info("Reset(saplingActivation=", sa, ")")
+	Log.Info("DarksideReset(saplingActivation=", sa, ")")
 	stopIngestor()
 	state = darksideState{
 		resetted:             true,
@@ -135,7 +138,7 @@ func setPrevhash() {
 			copy(blockBytes[4:4+32], prevhash)
 		}
 		prevhash = block.GetEncodableHash()
-		Log.Info("active block height ", block.GetHeight(), " hash ",
+		Log.Info("Darkside active block height ", block.GetHeight(), " hash ",
 			hex.EncodeToString(block.GetDisplayHash()),
 			" txcount ", block.GetTxCount())
 	}
@@ -150,7 +153,7 @@ func DarksideApplyStaged(height int) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
-	Log.Info("ApplyStaged(height=", height, ")")
+	Log.Info("DarksideApplyStaged(height=", height, ")")
 	if height < state.startHeight {
 		return errors.New(fmt.Sprint("height ", height,
 			" is less than sapling activation height ", state.startHeight))
@@ -209,9 +212,13 @@ func DarksideApplyStaged(height int) error {
 		block = append(block, tx.bytes...)
 		state.activeBlocks[tx.height-state.startHeight] = block
 	}
+	maxHeight := state.startHeight + len(state.activeBlocks) - 1
+	if height > maxHeight {
+		height = maxHeight
+	}
 	setPrevhash()
 	state.latestHeight = height
-	Log.Info("active blocks from ", state.startHeight,
+	Log.Info("darkside: active blocks from ", state.startHeight,
 		" to ", state.startHeight+len(state.activeBlocks)-1,
 		", latest presented height ", state.latestHeight)
 
@@ -241,7 +248,7 @@ func darksideStageBlock(caller string, b []byte) error {
 	if len(rest) != 0 {
 		return errors.New("block serialization is too long")
 	}
-	Log.Info(caller, "(height=", block.GetHeight(), ")")
+	Log.Info(caller, "DarksideStageBlock(height=", block.GetHeight(), ")")
 	if block.GetHeight() < state.startHeight {
 		return errors.New(fmt.Sprint("block height ", block.GetHeight(),
 			" is less than sapling activation height ", state.startHeight))
@@ -256,7 +263,7 @@ func DarksideStageBlocks(url string) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
-	Log.Info("StageBlocks(url=", url, ")")
+	Log.Info("DarksideStageBlocks(url=", url, ")")
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -289,7 +296,7 @@ func DarksideStageBlockStream(blockHex string) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
-	Log.Info("StageBlocksStream()")
+	Log.Info("DarksideStageBlocksStream()")
 	blockBytes, err := hex.DecodeString(blockHex)
 	if err != nil {
 		return err
@@ -305,7 +312,7 @@ func DarksideStageBlocksCreate(height int32, nonce int32, count int32) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
-	Log.Info("StageBlocksCreate(height=", height, ", nonce=", nonce, ", count=", count, ")")
+	Log.Info("DarksideStageBlocksCreate(height=", height, ", nonce=", nonce, ", count=", count, ")")
 	for i := 0; i < int(count); i++ {
 
 		fakeCoinbase := "0400008085202f890100000000000000000000000000000000000000000000000000" +
@@ -410,6 +417,18 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		}
 		return json.Marshal(hex.EncodeToString(state.activeBlocks[index]))
 
+	case "getbestblockhash":
+		state.mutex.RLock()
+		defer state.mutex.RUnlock()
+		if len(state.activeBlocks) == 0 {
+			Log.Fatal("getbestblockhash: no blocks")
+		}
+		index := state.latestHeight - state.startHeight
+		block := parser.NewBlock()
+		block.ParseFromSlice(state.activeBlocks[index])
+		hash := hex.EncodeToString(block.GetDisplayHash())
+		return json.Marshal(hash)
+
 	case "getaddresstxids":
 		// Not required for minimal reorg testing.
 		return nil, errors.New("not implemented yet")
@@ -458,6 +477,23 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			addTxToReply(tx.bytes)
 		}
 		return json.Marshal(reply)
+
+	case "getaddressutxos":
+		var req ZcashdRpcRequestGetaddressutxos
+		err := json.Unmarshal(params[0], &req)
+		if err != nil {
+			return nil, errors.New("failed to parse getaddressutxos JSON")
+		}
+		utxosReply := make([]ZcashdRpcReplyGetaddressutxos, 0)
+		for _, utxo := range state.getAddressUtxos {
+			for _, a := range req.Addresses {
+				if a == utxo.Address {
+					utxosReply = append(utxosReply, utxo)
+					break
+				}
+			}
+		}
+		return json.Marshal(utxosReply)
 
 	default:
 		return nil, errors.New("there was an attempt to call an unsupported RPC")
@@ -557,7 +593,7 @@ func DarksideStageTransactionsURL(height int, url string) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
-	Log.Info("StageTransactionsURL(height=", height, ", url=", url, ")")
+	Log.Info("DarksideStageTransactionsURL(height=", height, ", url=", url, ")")
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -584,4 +620,14 @@ func DarksideStageTransactionsURL(height int, url string) error {
 	}
 	return scan.Err()
 
+}
+
+func DarksideAddAddressUtxo(arg ZcashdRpcReplyGetaddressutxos) error {
+	state.getAddressUtxos = append(state.getAddressUtxos, arg)
+	return nil
+}
+
+func DarksideClearAddressUtxos() error {
+	state.getAddressUtxos = nil
+	return nil
 }

@@ -42,6 +42,7 @@ type Options struct {
 	NoTLSVeryInsecure   bool   `json:"no_tls_very_insecure,omitempty"`
 	GenCertVeryInsecure bool   `json:"gen_cert_very_insecure,omitempty"`
 	Redownload          bool   `json:"redownload"`
+	SyncFromHeight      int    `json:"sync_from_height"`
 	DataDir             string `json:"data_dir"`
 	PingEnable          bool   `json:"ping_enable"`
 	Darkside            bool   `json:"darkside"`
@@ -53,10 +54,16 @@ type Options struct {
 // in unit tests it points to a function to mock RPCs to zcashd.
 var RawRequest func(method string, params []json.RawMessage) (json.RawMessage, error)
 
-// Sleep allows a request to time.Sleep() to be mocked for testing;
-// in production, it points to the standard library time.Sleep();
-// in unit tests it points to a mock function.
-var Sleep func(d time.Duration)
+// Time allows time-related functions to be mocked for testing,
+// so that tests can be deterministic and so they don't require
+// real time to elapse. In production, these point to the standard
+// library `time` functions; in unit tests they point to mock
+// functions (set by the specific test as required).
+// More functions can be added later.
+var Time struct {
+	Sleep func(d time.Duration)
+	Now   func() time.Time
+}
 
 // Log as a global variable simplifies logging
 var Log *logrus.Entry
@@ -109,9 +116,16 @@ type (
 			}
 			SkipHash string
 		}
+		Orchard struct {
+			Commitments struct {
+				FinalState string
+			}
+			SkipHash string
+		}
 	}
 
-	// zcashd rpc "getrawtransaction"
+	// zcashd rpc "getrawtransaction txid 1" (1 means verbose), there are
+	// many more fields but these are the only ones we current need.
 	ZcashdRpcReplyGetrawtransaction struct {
 		Hex    string
 		Height int
@@ -129,13 +143,18 @@ type (
 	ZcashdRpcRequestGetaddressutxos struct {
 		Addresses []string `json:"addresses"`
 	}
-	ZcashdRpcReplyGetaddressutxos []struct {
+	ZcashdRpcReplyGetaddressutxos struct {
 		Address     string
 		Txid        string
 		OutputIndex int64
 		Script      string
 		Satoshis    uint64
 		Height      int
+	}
+
+	// reply to getblock verbose=1 (json includes txid list)
+	ZcashRpcReplyGetblock1 struct {
+		Tx []string
 	}
 )
 
@@ -166,7 +185,7 @@ func FirstRPC() {
 			"error": rpcErr.Error(),
 			"retry": retryCount,
 		}).Warn("error with getblockchaininfo rpc, retrying...")
-		Sleep(time.Duration(10+retryCount*5) * time.Second) // backoff
+		Time.Sleep(time.Duration(10+retryCount*5) * time.Second) // backoff
 	}
 }
 
@@ -240,7 +259,7 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	params := make([]json.RawMessage, 2)
 	heightJSON, err := json.Marshal(strconv.Itoa(height))
 	if err != nil {
-		return nil, errors.Wrap(err, "error marshaling height")
+		Log.Fatal("getBlockFromRPC bad height argument", height, err)
 	}
 	params[0] = heightJSON
 	params[1] = json.RawMessage("0") // non-verbose (raw hex)
@@ -279,6 +298,31 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 		return nil, errors.New("received unexpected height block")
 	}
 
+	// `block.ParseFromSlice` correctly parses blocks containing v5 transactions, but
+	// incorrectly computes the IDs of the v5 transactions. We temporarily paper over this
+	// bug by fetching the correct txids via a second getblock RPC call.
+	// https://github.com/zcash/lightwalletd/issues/392
+	{
+		params[1] = json.RawMessage("1") // JSON with list of txids
+		result, rpcErr := RawRequest("getblock", params)
+		if rpcErr != nil {
+			return nil, errors.Wrap(rpcErr, "error requesting verbose block")
+		}
+		var block1 ZcashRpcReplyGetblock1
+		err = json.Unmarshal(result, &block1)
+		if err != nil {
+			return nil, err
+		}
+		for i, t := range block.Transactions() {
+			txid, err := hex.DecodeString(block1.Tx[i])
+			if err != nil {
+				return nil, errors.Wrap(err, "error decoding getblock txid")
+			}
+			// convert from big-endian
+			t.SetTxID(parser.Reverse(txid))
+		}
+	}
+
 	return block.ToCompact(), nil
 }
 
@@ -303,11 +347,8 @@ func stopIngestor() {
 // BlockIngestor runs as a goroutine and polls zcashd for new blocks, adding them
 // to the cache. The repetition count, rep, is nonzero only for unit-testing.
 func BlockIngestor(c *BlockCache, rep int) {
-	lastLog := time.Now()
-	reorgCount := 0
+	lastLog := Time.Now()
 	lastHeightLogged := 0
-	retryCount := 0
-	wait := true
 
 	// Start listening for new blocks
 	for i := 0; rep == 0 || i < rep; i++ {
@@ -318,110 +359,60 @@ func BlockIngestor(c *BlockCache, rep int) {
 		default:
 		}
 
-		height := c.GetNextHeight()
-		block, err := getBlockFromRPC(height)
+		result, err := RawRequest("getbestblockhash", []json.RawMessage{})
 		if err != nil {
 			Log.WithFields(logrus.Fields{
-				"height": height,
-				"error":  err,
-			}).Warn("error zcashd getblock rpc")
-			retryCount++
-			if retryCount > 10 {
-				Log.WithFields(logrus.Fields{
-					"timeouts": retryCount,
-				}).Fatal("unable to issue RPC call to zcashd node")
-			}
-			// Delay then retry the same height.
+				"error": err,
+			}).Fatal("error zcashd getbestblockhash rpc")
+		}
+		var hashHex string
+		err = json.Unmarshal(result, &hashHex)
+		if err != nil {
+			Log.Fatal("bad getbestblockhash return:", err, result)
+		}
+		lastBestBlockHash := []byte{}
+		lastBestBlockHash, err = hex.DecodeString(hashHex)
+		if err != nil {
+			Log.Fatal("error decoding getbestblockhash", err, hashHex)
+		}
+
+		height := c.GetNextHeight()
+		if string(lastBestBlockHash) == string(parser.Reverse(c.GetLatestHash())) {
+			// Synced
 			c.Sync()
-			Sleep(10 * time.Second)
-			wait = true
+			if lastHeightLogged != height-1 {
+				lastHeightLogged = height - 1
+				Log.Info("Waiting for block: ", height)
+			}
+			Time.Sleep(2 * time.Second)
+			lastLog = Time.Now()
 			continue
 		}
-		retryCount = 0
-		if block == nil {
-			// No block at this height.
-			if height == c.GetFirstHeight() {
-				Log.Info("Waiting for zcashd height to reach Sapling activation height ",
-					"(", c.GetFirstHeight(), ")...")
-				reorgCount = 0
-				Sleep(20 * time.Second)
-				continue
-			}
-
-			// Check the current top block to see if there's a hash mismatch (i.e., a 1-block reorg)
-			curhash, err := getBestBlockHash()
-			if err != nil {
-				Log.WithFields(logrus.Fields{
-					"height": height,
-					"error":  err,
-				}).Warn("error zcashd getblock rpc")
-				continue
-			}
-			if c.HashMismatch(curhash) {
-				// Current block has a hash mismatch
-				Log.WithFields(logrus.Fields{
-					"height": height - 1,
-					"hash":   displayHash(curhash),
-					"phash":  displayHash(c.GetLatestHash()),
-					"reorg":  reorgCount,
-				}).Warn("REORG/Current Block")
-				c.Reorg(height - 1)
-				continue
-			}
-
-			if wait {
-				// Wait a bit then retry the same height.
-				c.Sync()
-				if lastHeightLogged+1 != height {
-					Log.Info("Ingestor waiting for block: ", height)
-					lastHeightLogged = height - 1
-				}
-				Sleep(2 * time.Second)
-				wait = false
-				continue
-			}
+		var block *walletrpc.CompactBlock
+		block, err = getBlockFromRPC(height)
+		if err != nil {
+			Log.Fatal("getblock failed, will retry", err)
 		}
-		if block == nil || c.HashMismatch(block.PrevHash) {
-			// This may not be a reorg; it may be we're at the tip
-			// and there's no new block yet, but we want to back up
-			// so we detect a reorg in which the new chain is the
-			// same length or shorter.
-			reorgCount++
-			if reorgCount > 100 {
-				Log.Fatal("Reorg exceeded max of 100 blocks! Help!")
+		if block != nil && c.HashMatch(block.PrevHash) {
+			if err = c.Add(height, block); err != nil {
+				Log.Fatal("Cache add failed:", err)
 			}
-			// Print the hash of the block that is getting reorg-ed away
-			// as 'phash', not the prevhash of the block we just received.
-			if block != nil {
-				Log.WithFields(logrus.Fields{
-					"height": height,
-					"hash":   displayHash(block.Hash),
-					"phash":  displayHash(c.GetLatestHash()),
-					"reorg":  reorgCount,
-				}).Warn("REORG")
-			} else if reorgCount > 1 {
-				Log.WithFields(logrus.Fields{
-					"height": height,
-					"phash":  displayHash(c.GetLatestHash()),
-					"reorg":  reorgCount,
-				}).Warn("REORG")
+			// Don't log these too often.
+			if DarksideEnabled || Time.Now().Sub(lastLog).Seconds() >= 4 {
+				lastLog = Time.Now()
+				Log.Info("Adding block to cache ", height, " ", displayHash(block.Hash))
 			}
-			// Try backing up
-			c.Reorg(height - 1)
 			continue
 		}
-		// We have a valid block to add.
-		wait = true
-		reorgCount = 0
-		if err := c.Add(height, block); err != nil {
-			Log.Fatal("Cache add failed:", err)
+		if height == c.GetFirstHeight() {
+			c.Sync()
+			Log.Info("Waiting for zcashd height to reach Sapling activation height ",
+				"(", c.GetFirstHeight(), ")...")
+			Time.Sleep(20 * time.Second)
+			return
 		}
-		// Don't log these too often.
-		if time.Since(lastLog).Seconds() >= 4 && c.GetNextHeight() == height+1 && height != lastHeightLogged {
-			lastLog = time.Now()
-			lastHeightLogged = height
-			Log.Info("Ingestor adding block to cache: ", height)
-		}
+		Log.Info("REORG: dropping block ", height-1, " ", displayHash(c.GetLatestHash()))
+		c.Reorg(height - 1)
 	}
 }
 

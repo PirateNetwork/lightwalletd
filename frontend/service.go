@@ -139,23 +139,14 @@ func (s *lwdStreamer) GetCurrentZECPrice(ctx context.Context, in *walletrpc.Empt
 
 // GetLatestBlock returns the height of the best chain, according to zcashd.
 func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
-	result, rpcErr := common.RawRequest("getblockchaininfo", []json.RawMessage{})
-	if rpcErr != nil {
-		return nil, rpcErr
-	}
-	var getblockchaininfoReply common.ZcashdRpcReplyGetblockchaininfo
-	err := json.Unmarshal(result, &getblockchaininfoReply)
-	if err != nil {
-		return nil, err
+	latestBlock := s.cache.GetLatestHeight()
+	latestHash := s.cache.GetLatestHash()
+
+	if latestBlock == -1 {
+		return nil, errors.New("Cache is empty. Server is probably not yet ready")
 	}
 
-	hash, err := hex.DecodeString(getblockchaininfoReply.BestBlockHash)
-	if err != nil {
-		return nil, err
-	}
-
-	common.Metrics.LatestBlockCounter.Inc()
-	return &walletrpc.BlockID{Height: uint64(getblockchaininfoReply.Blocks), Hash: parser.Reverse(hash)}, nil
+	return &walletrpc.BlockID{Height: uint64(latestBlock), Hash: latestHash}, nil
 }
 
 // GetTaddressTxids is a streaming RPC that returns transaction IDs that have
@@ -397,11 +388,12 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		return nil, errors.New("zcashd did not return treestate")
 	}
 	return &walletrpc.TreeState{
-		Network: s.chainName,
-		Height:  uint64(gettreestateReply.Height),
-		Hash:    gettreestateReply.Hash,
-		Time:    gettreestateReply.Time,
-		Tree:    gettreestateReply.Sapling.Commitments.FinalState,
+		Network:     s.chainName,
+		Height:      uint64(gettreestateReply.Height),
+		Hash:        gettreestateReply.Hash,
+		Time:        gettreestateReply.Time,
+		SaplingTree: gettreestateReply.Sapling.Commitments.FinalState,
+		OrchardTree: gettreestateReply.Orchard.Commitments.FinalState,
 	}, nil
 }
 
@@ -463,8 +455,9 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	// Result:
 	// "hex"             (string) The transaction hash in hex
 
+	// Verify rawtx
 	if rawtx == nil || rawtx.Data == nil {
-		return nil, errors.New("Bad Transaction or Data")
+		return nil, errors.New("Bad transaction data")
 	}
 
 	// Construct raw JSON-RPC params
@@ -562,6 +555,13 @@ func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStre
 	return nil
 }
 
+func (s *lwdStreamer) GetMempoolStream(_empty *walletrpc.Empty, resp walletrpc.CompactTxStreamer_GetMempoolStreamServer) error {
+	err := common.GetMempool(func(tx *walletrpc.RawTransaction) error {
+		return resp.Send(tx)
+	})
+	return err
+}
+
 // Key is 32-byte txid (as a 64-character string), data is pointer to compact tx.
 var mempoolMap *map[string]*walletrpc.CompactTx
 var mempoolList []string
@@ -622,7 +622,7 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 				return errors.New("extra data deserializing transaction")
 			}
 			newmempoolMap[txidstr] = &walletrpc.CompactTx{}
-			if tx.HasSaplingElements() {
+			if tx.HasShieldedElements() {
 				newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 			}
 		}
@@ -642,27 +642,6 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 		}
 	}
 	return nil
-}
-
-func (s *lwdStreamer) GetMempoolStream(_empty *walletrpc.Empty, resp walletrpc.CompactTxStreamer_GetMempoolStreamServer) error {
-	ch := make(chan *walletrpc.RawTransaction, 200)
-	go common.AddNewClient(ch)
-
-	for {
-		select {
-		case rtx, more := <-ch:
-			if !more || rtx == nil {
-				return nil
-			}
-
-			if resp.Send(rtx) != nil {
-				return nil
-			}
-		// Timeout after 5 mins
-		case <-time.After(5 * time.Minute):
-			return nil
-		}
-	}
 }
 
 // Return the subset of items that aren't excluded, but
@@ -730,7 +709,7 @@ func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAdd
 	if rpcErr != nil {
 		return rpcErr
 	}
-	var utxosReply common.ZcashdRpcReplyGetaddressutxos
+	var utxosReply []common.ZcashdRpcReplyGetaddressutxos
 	err = json.Unmarshal(result, &utxosReply)
 	if err != nil {
 		return err
@@ -908,4 +887,24 @@ func (s *DarksideStreamer) GetIncomingTransactions(in *walletrpc.Empty, resp wal
 func (s *DarksideStreamer) ClearIncomingTransactions(ctx context.Context, e *walletrpc.Empty) (*walletrpc.Empty, error) {
 	common.DarksideClearIncomingTransactions()
 	return &walletrpc.Empty{}, nil
+}
+
+// AddAddressUtxo adds a UTXO which will be returned by GetAddressUtxos() (above)
+func (s *DarksideStreamer) AddAddressUtxo(ctx context.Context, arg *walletrpc.GetAddressUtxosReply) (*walletrpc.Empty, error) {
+	utxosReply := common.ZcashdRpcReplyGetaddressutxos{
+		Address:     arg.Address,
+		Txid:        hex.EncodeToString(parser.Reverse(arg.Txid)),
+		OutputIndex: int64(arg.Index),
+		Script:      hex.EncodeToString(arg.Script),
+		Satoshis:    uint64(arg.ValueZat),
+		Height:      int(arg.Height),
+	}
+	err := common.DarksideAddAddressUtxo(utxosReply)
+	return &walletrpc.Empty{}, err
+}
+
+// ClearAddressUtxo removes the list of cached utxo entries
+func (s *DarksideStreamer) ClearAddressUtxo(ctx context.Context, arg *walletrpc.Empty) (*walletrpc.Empty, error) {
+	err := common.DarksideClearAddressUtxos()
+	return &walletrpc.Empty{}, err
 }

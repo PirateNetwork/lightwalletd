@@ -32,7 +32,8 @@ message TxFilter {
 }
 
 // RawTransaction contains the complete transaction data. It also optionally includes 
-// the block height in which the transaction was included.
+// the block height in which the transaction was included, or, when returned
+// by GetMempoolStream(), the latest block height.
 message RawTransaction {
     bytes data = 1;     // exact data returned by Zcash 'getrawtransaction'
     uint64 height = 2;  // height that the transaction was mined (or -1)
@@ -109,11 +110,12 @@ message Exclude {
 
 // The TreeState is derived from the Zcash z_gettreestate rpc.
 message TreeState {
-    string network = 1; // "main" or "test"
-    uint64 height = 2;
-    string hash = 3;    // block id
-    uint32 time = 4;    // Unix epoch time when the block was mined
-    string tree = 5;    // sapling commitment tree state
+    string network = 1;     // "main" or "test"
+    uint64 height = 2;      // block height
+    string hash = 3;        // block id
+    uint32 time = 4;        // Unix epoch time when the block was mined
+    string saplingTree = 5; // sapling commitment tree state
+    string orchardTree = 6; // orchard commitment tree state
 }
 
 // Results are sorted by height, which makes it easy to issue another

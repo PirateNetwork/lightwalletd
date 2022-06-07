@@ -154,6 +154,16 @@ func (s *String) ReadCompactLengthPrefixed(out *String) bool {
 	return true
 }
 
+// SkipCompactLengthPrefixed skips a CompactSize-encoded
+// length field.
+func (s *String) SkipCompactLengthPrefixed() bool {
+	var length int
+	if !s.ReadCompactSize(&length) {
+		return false
+	}
+	return s.Skip(length)
+}
+
 // ReadInt32 decodes a little-endian 32-bit value into out, treating it as
 // signed, and advances over it. It reports whether the read was successful.
 func (s *String) ReadInt32(out *int32) bool {

@@ -60,6 +60,7 @@ var rootCmd = &cobra.Command{
 			GenCertVeryInsecure: viper.GetBool("gen-cert-very-insecure"),
 			DataDir:             viper.GetString("data-dir"),
 			Redownload:          viper.GetBool("redownload"),
+			SyncFromHeight:      viper.GetInt("sync-from-height"),
 			PingEnable:          viper.GetBool("ping-very-insecure"),
 			Darkside:            viper.GetBool("darkside-very-insecure"),
 			DarksideTimeout:     viper.GetUint64("darkside-timeout"),
@@ -255,7 +256,11 @@ func startServer(opts *common.Options) error {
 		os.Stderr.WriteString(fmt.Sprintf("\n  ** Can't create db directory: %s\n\n", dbPath))
 		os.Exit(1)
 	}
-	cache := common.NewBlockCache(dbPath, chainName, saplingHeight, opts.Redownload)
+	syncFromHeight := opts.SyncFromHeight
+	if opts.Redownload {
+		syncFromHeight = 0
+	}
+	cache := common.NewBlockCache(dbPath, chainName, saplingHeight, syncFromHeight)
 	if !opts.Darkside {
 		go common.BlockIngestor(cache, 0 /*loop forever*/)
 	} else {
@@ -286,10 +291,6 @@ func startServer(opts *common.Options) error {
 	// Initialize price fetcher
 	common.StartPriceFetcher(dbPath, chainName)
 
-	// Initialize mempool monitor
-	exitMempool := make(chan bool)
-	common.StartMempoolMonitor(cache, exitMempool)
-
 	// Start listening
 	listener, err := net.Listen("tcp", opts.GRPCBindAddr)
 	if err != nil {
@@ -309,7 +310,6 @@ func startServer(opts *common.Options) error {
 			"signal": s.String(),
 		}).Info("caught signal, stopping gRPC server")
 
-		exitMempool <- true
 		os.Exit(1)
 	}()
 
@@ -350,6 +350,7 @@ func init() {
 	rootCmd.Flags().Bool("no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("gen-cert-very-insecure", false, "run with self-signed TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zcashd; reinitialize local cache files")
+	rootCmd.Flags().Int("sync-from-height", -1, "re-fetch blocks from zcashd start at this height")
 	rootCmd.Flags().String("data-dir", "/var/lib/lightwalletd", "data directory (such as db)")
 	rootCmd.Flags().Bool("ping-very-insecure", false, "allow Ping GRPC for testing")
 	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zcashd for integration testing (shuts down after 30 minutes)")
@@ -381,6 +382,8 @@ func init() {
 	viper.SetDefault("gen-cert-very-insecure", false)
 	viper.BindPFlag("redownload", rootCmd.Flags().Lookup("redownload"))
 	viper.SetDefault("redownload", false)
+	viper.BindPFlag("sync-from-height", rootCmd.Flags().Lookup("sync-from-height"))
+	viper.SetDefault("sync-from-height", -1)
 	viper.BindPFlag("data-dir", rootCmd.Flags().Lookup("data-dir"))
 	viper.SetDefault("data-dir", "/var/lib/lightwalletd")
 	viper.BindPFlag("ping-very-insecure", rootCmd.Flags().Lookup("ping-very-insecure"))
@@ -409,8 +412,9 @@ func init() {
 
 	logrus.RegisterExitHandler(onexit)
 
-	// Indirect function for test mocking (so unit tests can talk to stub functions)
-	common.Sleep = time.Sleep
+	// Indirect functions for test mocking (so unit tests can talk to stub functions)
+	common.Time.Sleep = time.Sleep
+	common.Time.Now = time.Now
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -421,7 +425,7 @@ func initConfig() {
 	} else {
 		// Look in the current directory for a configuration file
 		viper.AddConfigPath(".")
-		// Viper auto appends extention to this config name
+		// Viper auto appends extension to this config name
 		// For example, lightwalletd.yml
 		viper.SetConfigName("lightwalletd")
 	}
