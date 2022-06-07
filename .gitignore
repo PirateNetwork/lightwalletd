@@ -1,5 +1,5 @@
 first-make-timestamp
-lightwalletd
+lightwalletd.*
 lightwalletd.exe
 server.log
 db/
