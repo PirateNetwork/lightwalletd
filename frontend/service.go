@@ -557,7 +557,9 @@ func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStre
 
 func (s *lwdStreamer) GetMempoolStream(_empty *walletrpc.Empty, resp walletrpc.CompactTxStreamer_GetMempoolStreamServer) error {
 	err := common.GetMempool(func(tx *walletrpc.RawTransaction) error {
-		return resp.Send(tx)
+		// Temporarily disable sending mempool because of very large tx sizes
+		//return resp.Send(tx)
+		return nil
 	})
 	return err
 }
