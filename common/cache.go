@@ -1,4 +1,5 @@
 // Copyright (c) 2019-2020 The Zcash developers
+// Copyright (c) 2019-2021 Pirate Chain developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
@@ -15,7 +16,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/adityapk00/lightwalletd/walletrpc"
+	"github.com/PirateNetwork/lightwalletd/walletrpc"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -285,7 +286,7 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) error {
 	bheight := int(block.Height)
 
 	if bheight != height {
-		// This could only happen if zcashd returned the wrong
+		// This could only happen if pirated returned the wrong
 		// block (not the height we requested).
 		Log.Fatal("cache.Add wrong height: ", bheight, " expecting: ", height)
 		return nil

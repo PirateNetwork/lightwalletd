@@ -94,7 +94,7 @@ On the next screen, select the `Prometheus` and `Loki` values (there should only
 Click `Import`
 
 
-This should then be taken to the `Zcashd node exporter` dashboard.
+This should then be taken to the `Pirated node exporter` dashboard.
 
 ![grafana-zcashd-dashboard](./images/grafana-zcashd-dashboard.png)
 

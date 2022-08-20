@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adityapk00/lightwalletd/walletrpc"
+	"github.com/PirateNetwork/lightwalletd/walletrpc"
 )
 
 type txid string
@@ -29,7 +29,7 @@ var (
 
 	// The most recent zcashd getblockchaininfo reply, for height and best block
 	// hash (tip) which is used to detect when a new block arrives.
-	g_lastBlockChainInfo *ZcashdRpcReplyGetblockchaininfo = &ZcashdRpcReplyGetblockchaininfo{}
+	g_lastBlockChainInfo *PiratedRpcReplyGetblockchaininfo = &PiratedRpcReplyGetblockchaininfo{}
 
 	// Mutex to protect the above variables.
 	g_lock sync.Mutex
@@ -142,12 +142,12 @@ func refreshMempoolTxns() error {
 	return nil
 }
 
-func getLatestBlockChainInfo() (*ZcashdRpcReplyGetblockchaininfo, error) {
+func getLatestBlockChainInfo() (*PiratedRpcReplyGetblockchaininfo, error) {
 	result, rpcErr := RawRequest("getblockchaininfo", []json.RawMessage{})
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
-	var getblockchaininfoReply ZcashdRpcReplyGetblockchaininfo
+	var getblockchaininfoReply PiratedRpcReplyGetblockchaininfo
 	err := json.Unmarshal(result, &getblockchaininfoReply)
 	if err != nil {
 		return nil, err

@@ -1,4 +1,5 @@
 // Copyright (c) 2019-2020 The Zcash developers
+// Copyright (c) 2019-2021 Pirate Chain developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
@@ -9,8 +10,8 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/adityapk00/lightwalletd/parser/internal/bytestring"
-	"github.com/adityapk00/lightwalletd/walletrpc"
+	"github.com/PirateNetwork/lightwalletd/parser/internal/bytestring"
+	"github.com/PirateNetwork/lightwalletd/walletrpc"
 )
 
 type rawTransaction struct {
@@ -71,7 +72,7 @@ func (tx *txIn) ParseFromSlice(data []byte) ([]byte, error) {
 
 // Txout format as described in https://en.bitcoin.it/wiki/Transaction
 type txOut struct {
-	// Non-negative int giving the number of zatoshis to be transferred
+	// Non-negative int giving the number of arrrtoshis to be transferred
 	Value uint64
 
 	// Script. CompactSize-prefixed.
@@ -335,7 +336,7 @@ func (p *action) ToCompact() *walletrpc.CompactOrchardAction {
 	}
 }
 
-// Transaction encodes a full (zcashd) transaction.
+// Transaction encodes a full (pirated) transaction.
 type Transaction struct {
 	*rawTransaction
 	rawBytes []byte

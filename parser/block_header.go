@@ -1,4 +1,5 @@
 // Copyright (c) 2019-2020 The Zcash developers
+// Copyright (c) 2019-2021 Pirate Chain developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
@@ -11,7 +12,7 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"github.com/adityapk00/lightwalletd/parser/internal/bytestring"
+	"github.com/PirateNetwork/lightwalletd/parser/internal/bytestring"
 	"github.com/pkg/errors"
 )
 

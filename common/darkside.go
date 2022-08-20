@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adityapk00/lightwalletd/parser"
+	"github.com/PirateNetwork/lightwalletd/parser"
 )
 
 type darksideState struct {
@@ -26,12 +26,12 @@ type darksideState struct {
 	mutex       sync.RWMutex
 
 	// This is the highest (latest) block height currently being presented
-	// by the mock zcashd.
+	// by the mock pirated.
 	latestHeight int
 
-	// These blocks (up to and including tip) are presented by mock zcashd.
+	// These blocks (up to and including tip) are presented by mock pirated.
 	// activeBlocks[0] is the block at height startHeight.
-	activeBlocks [][]byte // full blocks, binary, as from zcashd getblock rpc
+	activeBlocks [][]byte // full blocks, binary, as from pirated getblock rpc
 
 	// Staged blocks are waiting to be applied (by ApplyStaged()) to activeBlocks.
 	// They are in order of arrival (not necessarily sorted by height), and are
@@ -48,7 +48,7 @@ type darksideState struct {
 	stagedTransactions []stagedTx
 
 	// Unordered list of replies
-	getAddressUtxos []ZcashdRpcReplyGetaddressutxos
+	getAddressUtxos []PiratedRpcReplyGetaddressutxos
 }
 
 var state darksideState
@@ -373,7 +373,7 @@ func DarksideClearIncomingTransactions() {
 func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessage, error) {
 	switch method {
 	case "getblockchaininfo":
-		blockchaininfo := &ZcashdRpcReplyGetblockchaininfo{
+		blockchaininfo := &PiratedRpcReplyGetblockchaininfo{
 			Chain: state.chainName,
 			Upgrades: map[string]Upgradeinfo{
 				"76b809bb": {ActivationHeight: state.startHeight},
@@ -384,7 +384,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		return json.Marshal(blockchaininfo)
 
 	case "getinfo":
-		info := &ZcashdRpcReplyGetinfo{}
+		info := &PiratedRpcReplyGetinfo{}
 		return json.Marshal(info)
 
 	case "getblock":
@@ -479,12 +479,12 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		return json.Marshal(reply)
 
 	case "getaddressutxos":
-		var req ZcashdRpcRequestGetaddressutxos
+		var req PiratedRpcRequestGetaddressutxos
 		err := json.Unmarshal(params[0], &req)
 		if err != nil {
 			return nil, errors.New("failed to parse getaddressutxos JSON")
 		}
-		utxosReply := make([]ZcashdRpcReplyGetaddressutxos, 0)
+		utxosReply := make([]PiratedRpcReplyGetaddressutxos, 0)
 		for _, utxo := range state.getAddressUtxos {
 			for _, a := range req.Addresses {
 				if a == utxo.Address {
@@ -622,7 +622,7 @@ func DarksideStageTransactionsURL(height int, url string) error {
 
 }
 
-func DarksideAddAddressUtxo(arg ZcashdRpcReplyGetaddressutxos) error {
+func DarksideAddAddressUtxo(arg PiratedRpcReplyGetaddressutxos) error {
 	state.getAddressUtxos = append(state.getAddressUtxos, arg)
 	return nil
 }

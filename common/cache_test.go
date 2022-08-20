@@ -1,4 +1,5 @@
 // Copyright (c) 2019-2020 The Zcash developers
+// Copyright (c) 2019-2021 Pirate Chain developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 package common
@@ -10,8 +11,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/adityapk00/lightwalletd/parser"
-	"github.com/adityapk00/lightwalletd/walletrpc"
+	"github.com/PirateNetwork/lightwalletd/parser"
+	"github.com/PirateNetwork/lightwalletd/walletrpc"
 )
 
 var compacts []*walletrpc.CompactBlock
