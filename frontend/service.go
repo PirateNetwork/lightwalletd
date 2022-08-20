@@ -262,12 +262,57 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 
 	peerip := s.peerIPFromContext(resp.Context())
 
+	// Latency logging
+	go func() {
+		// If there is no ip, ignore
+		if peerip == "unknown" {
+			return
+		}
+
+		// Log only if bulk requesting blocks
+		if span.End.Height-span.Start.Height < 100 {
+			return
+		}
+
+		now := time.Now().UnixNano()
+		s.latencyMutex.Lock()
+		defer s.latencyMutex.Unlock()
+
+		// remove all old entries
+		for ip, entry := range s.latencyCache {
+			if entry.timeNanos+int64(30*math.Pow10(9)) < now { // delete after 30 seconds
+				delete(s.latencyCache, ip)
+			}
+		}
+
+		// Look up if this ip address has a previous getblock range
+		if entry, ok := s.latencyCache[peerip]; ok {
+			// Log only continous blocks
+			if entry.lastBlock+1 == span.Start.Height {
+				common.Log.WithFields(logrus.Fields{
+					"method":         "GetBlockRangeLatency",
+					"peer_addr":      peerip,
+					"num_blocks":     entry.totalBlocks,
+					"end_height":     entry.lastBlock,
+					"latency_millis": (now - entry.timeNanos) / int64(math.Pow10(6)),
+				}).Info("Service")
+			}
+		}
+
+		// Add or update the ip entry
+		s.latencyCache[peerip] = &latencyCacheEntry{
+			lastBlock:   span.End.Height,
+			totalBlocks: span.End.Height - span.Start.Height + 1,
+			timeNanos:   now,
+		}
+	}()
+
 	// Logging and metrics
 	go func() {
 		// Log a daily active user if the user requests the day's "key block"
-		// for height := span.Start.Height; height <= span.End.Height; height++ {
-		// 	s.dailyActiveBlock(height, peerip)
-		// }
+		for height := span.Start.Height; height <= span.End.Height; height++ {
+			s.dailyActiveBlock(height, peerip)
+		}
 
 		common.Log.WithFields(logrus.Fields{
 			"method":    "GetBlockRange",
@@ -513,9 +558,7 @@ func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStre
 
 func (s *lwdStreamer) GetMempoolStream(_empty *walletrpc.Empty, resp walletrpc.CompactTxStreamer_GetMempoolStreamServer) error {
 	err := common.GetMempool(func(tx *walletrpc.RawTransaction) error {
-		// Temporarily disable sending mempool because of very large tx sizes
-		//return resp.Send(tx)
-		return nil
+		return resp.Send(tx)
 	})
 	return err
 }
@@ -524,88 +567,82 @@ func (s *lwdStreamer) GetMempoolStream(_empty *walletrpc.Empty, resp walletrpc.C
 var mempoolMap *map[string]*walletrpc.CompactTx
 var mempoolList []string
 
-// Last time we pulled a copy of the mempool from pirated.
+// Last time we pulled a copy of the mempool from zcashd.
 var lastMempool time.Time
 
 func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.CompactTxStreamer_GetMempoolTxServer) error {
-	// Temporarily disable sending mempool txns
+	if time.Now().Sub(lastMempool).Seconds() >= 2 {
+		lastMempool = time.Now()
+		// Refresh our copy of the mempool.
+		params := make([]json.RawMessage, 0)
+		result, rpcErr := common.RawRequest("getrawmempool", params)
+		if rpcErr != nil {
+			return rpcErr
+		}
+		err := json.Unmarshal(result, &mempoolList)
+		if err != nil {
+			return err
+		}
+		newmempoolMap := make(map[string]*walletrpc.CompactTx)
+		if mempoolMap == nil {
+			mempoolMap = &newmempoolMap
+		}
+		for _, txidstr := range mempoolList {
+			if ctx, ok := (*mempoolMap)[txidstr]; ok {
+				// This ctx has already been fetched, copy pointer to it.
+				newmempoolMap[txidstr] = ctx
+				continue
+			}
+			txidJSON, err := json.Marshal(txidstr)
+			if err != nil {
+				return err
+			}
+			// The "0" is because we only need the raw hex, which is returned as
+			// just a hex string, and not even a json string (with quotes).
+			params := []json.RawMessage{txidJSON, json.RawMessage("0")}
+			result, rpcErr := common.RawRequest("getrawtransaction", params)
+			if rpcErr != nil {
+				// Not an error; mempool transactions can disappear
+				continue
+			}
+			// strip the quotes
+			var txStr string
+			err = json.Unmarshal(result, &txStr)
+			if err != nil {
+				return err
+			}
+
+			// conver to binary
+			txBytes, err := hex.DecodeString(txStr)
+			if err != nil {
+				return err
+			}
+			tx := parser.NewTransaction()
+			txdata, err := tx.ParseFromSlice(txBytes)
+			if len(txdata) > 0 {
+				return errors.New("extra data deserializing transaction")
+			}
+			newmempoolMap[txidstr] = &walletrpc.CompactTx{}
+			if tx.HasShieldedElements() {
+				newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
+			}
+		}
+		mempoolMap = &newmempoolMap
+	}
+	excludeHex := make([]string, len(exclude.Txid))
+	for i := 0; i < len(exclude.Txid); i++ {
+		excludeHex[i] = hex.EncodeToString(parser.Reverse(exclude.Txid[i]))
+	}
+	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
+		tx := (*mempoolMap)[txid]
+		if len(tx.Hash) > 0 {
+			err := resp.Send(tx)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
-
-	// if exclude == nil || exclude.Txid == nil {
-	// 	return errors.New("Invalid Exclude")
-	// }
-	// if time.Now().Sub(lastMempool).Seconds() >= 2 {
-	// 	lastMempool = time.Now()
-	// 	// Refresh our copy of the mempool.
-	// 	params := make([]json.RawMessage, 0)
-	// 	result, rpcErr := common.RawRequest("getrawmempool", params)
-	// 	if rpcErr != nil {
-	// 		return rpcErr
-	// 	}
-	// 	err := json.Unmarshal(result, &mempoolList)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	newmempoolMap := make(map[string]*walletrpc.CompactTx)
-	// 	if mempoolMap == nil {
-	// 		mempoolMap = &newmempoolMap
-	// 	}
-	// 	for _, txidstr := range mempoolList {
-	// 		if ctx, ok := (*mempoolMap)[txidstr]; ok {
-	// 			// This ctx has already been fetched, copy pointer to it.
-	// 			newmempoolMap[txidstr] = ctx
-	// 			continue
-	// 		}
-	// 		txidJSON, err := json.Marshal(txidstr)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		// The "0" is because we only need the raw hex, which is returned as
-	// 		// just a hex string, and not even a json string (with quotes).
-	// 		params := []json.RawMessage{txidJSON, json.RawMessage("0")}
-	// 		result, rpcErr := common.RawRequest("getrawtransaction", params)
-	// 		if rpcErr != nil {
-	// 			// Not an error; mempool transactions can disappear
-	// 			continue
-	// 		}
-	// 		// strip the quotes
-	// 		var txStr string
-	// 		err = json.Unmarshal(result, &txStr)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-
-	// 		// conver to binary
-	// 		txBytes, err := hex.DecodeString(txStr)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		tx := parser.NewTransaction()
-	// 		txdata, err := tx.ParseFromSlice(txBytes)
-	// 		if len(txdata) > 0 {
-	// 			return errors.New("extra data deserializing transaction")
-	// 		}
-	// 		newmempoolMap[txidstr] = &walletrpc.CompactTx{}
-	// 		if tx.HasShieldedElements() {
-	// 			newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
-	// 		}
-	// 	}
-	// 	mempoolMap = &newmempoolMap
-	// }
-	// excludeHex := make([]string, len(exclude.Txid))
-	// for i := 0; i < len(exclude.Txid); i++ {
-	// 	excludeHex[i] = hex.EncodeToString(parser.Reverse(exclude.Txid[i]))
-	// }
-	// for _, txid := range MempoolFilter(mempoolList, excludeHex) {
-	// 	tx := (*mempoolMap)[txid]
-	// 	if len(tx.Hash) > 0 {
-	// 		err := resp.Send(tx)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 	}
-	// }
-	// return nil
 }
 
 // Return the subset of items that aren't excluded, but
