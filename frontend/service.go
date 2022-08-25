@@ -61,15 +61,6 @@ func NewDarksideStreamer(cache *common.BlockCache) (walletrpc.DarksideStreamerSe
 	return &DarksideStreamer{cache: cache}, nil
 }
 
-// Test to make sure Address is a single t address
-func checkTaddress(taddr string) error {
-	match, err := regexp.Match("\\At[a-zA-Z0-9]{34}\\z", []byte(taddr))
-	if err != nil || !match {
-		return errors.New("Invalid address")
-	}
-	return nil
-}
-
 func (s *lwdStreamer) peerIPFromContext(ctx context.Context) string {
 	if xRealIP, ok := metadata.FromIncomingContext(ctx); ok {
 		realIP := xRealIP.Get("x-real-ip")
@@ -153,9 +144,6 @@ func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 // GetTaddressTxids is a streaming RPC that returns transaction IDs that have
 // the given transparent address (taddr) as either an input or output.
 func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetTaddressTxidsServer) error {
-	if err := checkTaddress(addressBlockFilter.Address); err != nil {
-		return err
-	}
 
 	if addressBlockFilter.Range == nil {
 		return errors.New("Must specify block range")
@@ -503,11 +491,6 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 }
 
 func getTaddressBalancePiratedRpc(addressList []string) (*walletrpc.Balance, error) {
-	for _, addr := range addressList {
-		if err := checkTaddress(addr); err != nil {
-			return &walletrpc.Balance{}, err
-		}
-	}
 	params := make([]json.RawMessage, 1)
 	addrList := &common.PiratedRpcRequestGetaddressbalance{
 		Addresses: addressList,
@@ -692,11 +675,6 @@ func MempoolFilter(items, exclude []string) []string {
 }
 
 func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAddressUtxosReply) error) error {
-	for _, a := range arg.Addresses {
-		if err := checkTaddress(a); err != nil {
-			return err
-		}
-	}
 	params := make([]json.RawMessage, 1)
 	addrList := &common.PiratedRpcRequestGetaddressutxos{
 		Addresses: arg.Addresses,
