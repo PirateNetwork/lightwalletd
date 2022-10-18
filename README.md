@@ -70,22 +70,28 @@ server {
 ##### b. Use without TLS certificate
 You can run lightwalletd without TLS and server traffic over `http`. This is recommended only for local testing
 
-#### 3. Run the frontend:
+#### 3. Compile the binary:
+
+```
+go build
+```
+
+#### 4. Run the frontend:
 You can run the gRPC server with or without TLS, depending on how you configured step 2. If you are using NGINX as a reverse proxy and are letting NGINX handle the TLS authentication, then run the frontend with `-no-tls`
 
 ```
-go run cmd/server/main.go -bind-addr 127.0.0.1:9067 -conf-file ~/.komodo/PIRATE/PIRATE.conf -no-tls
+lightwalletd -bind-addr 127.0.0.1:9067 -conf-file ~/.komodo/PIRATE/PIRATE.conf -no-tls
 ```
 
 If you have a certificate that you want to use (either self signed, or from a certificate authority), pass the certificate to the frontend:
 
 ```
-go run cmd/server/main.go -bind-addr 127.0.0.1:443 -conf-file ~/.komodo/PIRATE/PIRATE.conf  -tls-cert cert.pem -tls-key key.pem
+lightwalletd -bind-addr 127.0.0.1:443 -conf-file ~/.komodo/PIRATE/PIRATE.conf  -tls-cert cert.pem -tls-key key.pem
 ```
 
-You should start seeing the frontend ingest and cache the zcash blocks after ~15 seconds. 
+You should start seeing the frontend ingest and cache the zcash blocks after ~15 seconds.
 
-#### 4. Point the `arrrrwallet-cli` to this server
+#### 5. Point the `arrrrwallet-cli` to this server
 Connect to your server!
 ```
 ./arrrrwallet-cli -server https://mylightwalletd.server.com:443
