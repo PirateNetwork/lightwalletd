@@ -1571,70 +1571,70 @@ func file_service_proto_rawDescGZIP() []byte {
 
 var file_service_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_service_proto_goTypes = []interface{}{
-	(*BlockID)(nil),                       // 0: cash.z.wallet.sdk.rpc.BlockID
-	(*BlockRange)(nil),                    // 1: cash.z.wallet.sdk.rpc.BlockRange
-	(*TxFilter)(nil),                      // 2: cash.z.wallet.sdk.rpc.TxFilter
-	(*RawTransaction)(nil),                // 3: cash.z.wallet.sdk.rpc.RawTransaction
-	(*SendResponse)(nil),                  // 4: cash.z.wallet.sdk.rpc.SendResponse
-	(*ChainSpec)(nil),                     // 5: cash.z.wallet.sdk.rpc.ChainSpec
-	(*Empty)(nil),                         // 6: cash.z.wallet.sdk.rpc.Empty
-	(*LightdInfo)(nil),                    // 7: cash.z.wallet.sdk.rpc.LightdInfo
-	(*TransparentAddressBlockFilter)(nil), // 8: cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter
-	(*Duration)(nil),                      // 9: cash.z.wallet.sdk.rpc.Duration
-	(*PingResponse)(nil),                  // 10: cash.z.wallet.sdk.rpc.PingResponse
-	(*Address)(nil),                       // 11: cash.z.wallet.sdk.rpc.Address
-	(*AddressList)(nil),                   // 12: cash.z.wallet.sdk.rpc.AddressList
-	(*Balance)(nil),                       // 13: cash.z.wallet.sdk.rpc.Balance
-	(*Exclude)(nil),                       // 14: cash.z.wallet.sdk.rpc.Exclude
-	(*TreeState)(nil),                     // 15: cash.z.wallet.sdk.rpc.TreeState
-	(*GetAddressUtxosArg)(nil),            // 16: cash.z.wallet.sdk.rpc.GetAddressUtxosArg
-	(*GetAddressUtxosReply)(nil),          // 17: cash.z.wallet.sdk.rpc.GetAddressUtxosReply
-	(*GetAddressUtxosReplyList)(nil),      // 18: cash.z.wallet.sdk.rpc.GetAddressUtxosReplyList
-	(*PriceRequest)(nil),                  // 19: cash.z.wallet.sdk.rpc.PriceRequest
-	(*PriceResponse)(nil),                 // 20: cash.z.wallet.sdk.rpc.PriceResponse
-	(*CompactBlock)(nil),                  // 21: cash.z.wallet.sdk.rpc.CompactBlock
-	(*CompactTx)(nil),                     // 22: cash.z.wallet.sdk.rpc.CompactTx
+	(*BlockID)(nil),                       // 0: pirate.wallet.sdk.rpc.BlockID
+	(*BlockRange)(nil),                    // 1: pirate.wallet.sdk.rpc.BlockRange
+	(*TxFilter)(nil),                      // 2: pirate.wallet.sdk.rpc.TxFilter
+	(*RawTransaction)(nil),                // 3: pirate.wallet.sdk.rpc.RawTransaction
+	(*SendResponse)(nil),                  // 4: pirate.wallet.sdk.rpc.SendResponse
+	(*ChainSpec)(nil),                     // 5: pirate.wallet.sdk.rpc.ChainSpec
+	(*Empty)(nil),                         // 6: pirate.wallet.sdk.rpc.Empty
+	(*LightdInfo)(nil),                    // 7: pirate.wallet.sdk.rpc.LightdInfo
+	(*TransparentAddressBlockFilter)(nil), // 8: pirate.wallet.sdk.rpc.TransparentAddressBlockFilter
+	(*Duration)(nil),                      // 9: pirate.wallet.sdk.rpc.Duration
+	(*PingResponse)(nil),                  // 10: pirate.wallet.sdk.rpc.PingResponse
+	(*Address)(nil),                       // 11: pirate.wallet.sdk.rpc.Address
+	(*AddressList)(nil),                   // 12: pirate.wallet.sdk.rpc.AddressList
+	(*Balance)(nil),                       // 13: pirate.wallet.sdk.rpc.Balance
+	(*Exclude)(nil),                       // 14: pirate.wallet.sdk.rpc.Exclude
+	(*TreeState)(nil),                     // 15: pirate.wallet.sdk.rpc.TreeState
+	(*GetAddressUtxosArg)(nil),            // 16: pirate.wallet.sdk.rpc.GetAddressUtxosArg
+	(*GetAddressUtxosReply)(nil),          // 17: pirate.wallet.sdk.rpc.GetAddressUtxosReply
+	(*GetAddressUtxosReplyList)(nil),      // 18: pirate.wallet.sdk.rpc.GetAddressUtxosReplyList
+	(*PriceRequest)(nil),                  // 19: pirate.wallet.sdk.rpc.PriceRequest
+	(*PriceResponse)(nil),                 // 20: pirate.wallet.sdk.rpc.PriceResponse
+	(*CompactBlock)(nil),                  // 21: pirate.wallet.sdk.rpc.CompactBlock
+	(*CompactTx)(nil),                     // 22: pirate.wallet.sdk.rpc.CompactTx
 }
 var file_service_proto_depIdxs = []int32{
-	0,  // 0: cash.z.wallet.sdk.rpc.BlockRange.start:type_name -> cash.z.wallet.sdk.rpc.BlockID
-	0,  // 1: cash.z.wallet.sdk.rpc.BlockRange.end:type_name -> cash.z.wallet.sdk.rpc.BlockID
-	0,  // 2: cash.z.wallet.sdk.rpc.TxFilter.block:type_name -> cash.z.wallet.sdk.rpc.BlockID
-	1,  // 3: cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter.range:type_name -> cash.z.wallet.sdk.rpc.BlockRange
-	17, // 4: cash.z.wallet.sdk.rpc.GetAddressUtxosReplyList.addressUtxos:type_name -> cash.z.wallet.sdk.rpc.GetAddressUtxosReply
-	5,  // 5: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetLatestBlock:input_type -> cash.z.wallet.sdk.rpc.ChainSpec
-	0,  // 6: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetBlock:input_type -> cash.z.wallet.sdk.rpc.BlockID
-	1,  // 7: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetBlockRange:input_type -> cash.z.wallet.sdk.rpc.BlockRange
-	19, // 8: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetZECPrice:input_type -> cash.z.wallet.sdk.rpc.PriceRequest
-	6,  // 9: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetCurrentZECPrice:input_type -> cash.z.wallet.sdk.rpc.Empty
-	2,  // 10: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetTransaction:input_type -> cash.z.wallet.sdk.rpc.TxFilter
-	3,  // 11: cash.z.wallet.sdk.rpc.CompactTxStreamer.SendTransaction:input_type -> cash.z.wallet.sdk.rpc.RawTransaction
-	8,  // 12: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetTaddressTxids:input_type -> cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter
-	12, // 13: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetTaddressBalance:input_type -> cash.z.wallet.sdk.rpc.AddressList
-	11, // 14: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetTaddressBalanceStream:input_type -> cash.z.wallet.sdk.rpc.Address
-	14, // 15: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetMempoolTx:input_type -> cash.z.wallet.sdk.rpc.Exclude
-	6,  // 16: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetMempoolStream:input_type -> cash.z.wallet.sdk.rpc.Empty
-	0,  // 17: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetTreeState:input_type -> cash.z.wallet.sdk.rpc.BlockID
-	16, // 18: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetAddressUtxos:input_type -> cash.z.wallet.sdk.rpc.GetAddressUtxosArg
-	16, // 19: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetAddressUtxosStream:input_type -> cash.z.wallet.sdk.rpc.GetAddressUtxosArg
-	6,  // 20: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetLightdInfo:input_type -> cash.z.wallet.sdk.rpc.Empty
-	9,  // 21: cash.z.wallet.sdk.rpc.CompactTxStreamer.Ping:input_type -> cash.z.wallet.sdk.rpc.Duration
-	0,  // 22: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetLatestBlock:output_type -> cash.z.wallet.sdk.rpc.BlockID
-	21, // 23: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetBlock:output_type -> cash.z.wallet.sdk.rpc.CompactBlock
-	21, // 24: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetBlockRange:output_type -> cash.z.wallet.sdk.rpc.CompactBlock
-	20, // 25: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetZECPrice:output_type -> cash.z.wallet.sdk.rpc.PriceResponse
-	20, // 26: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetCurrentZECPrice:output_type -> cash.z.wallet.sdk.rpc.PriceResponse
-	3,  // 27: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetTransaction:output_type -> cash.z.wallet.sdk.rpc.RawTransaction
-	4,  // 28: cash.z.wallet.sdk.rpc.CompactTxStreamer.SendTransaction:output_type -> cash.z.wallet.sdk.rpc.SendResponse
-	3,  // 29: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetTaddressTxids:output_type -> cash.z.wallet.sdk.rpc.RawTransaction
-	13, // 30: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetTaddressBalance:output_type -> cash.z.wallet.sdk.rpc.Balance
-	13, // 31: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetTaddressBalanceStream:output_type -> cash.z.wallet.sdk.rpc.Balance
-	22, // 32: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetMempoolTx:output_type -> cash.z.wallet.sdk.rpc.CompactTx
-	3,  // 33: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetMempoolStream:output_type -> cash.z.wallet.sdk.rpc.RawTransaction
-	15, // 34: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetTreeState:output_type -> cash.z.wallet.sdk.rpc.TreeState
-	18, // 35: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetAddressUtxos:output_type -> cash.z.wallet.sdk.rpc.GetAddressUtxosReplyList
-	17, // 36: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetAddressUtxosStream:output_type -> cash.z.wallet.sdk.rpc.GetAddressUtxosReply
-	7,  // 37: cash.z.wallet.sdk.rpc.CompactTxStreamer.GetLightdInfo:output_type -> cash.z.wallet.sdk.rpc.LightdInfo
-	10, // 38: cash.z.wallet.sdk.rpc.CompactTxStreamer.Ping:output_type -> cash.z.wallet.sdk.rpc.PingResponse
+	0,  // 0: pirate.wallet.sdk.rpc.BlockRange.start:type_name -> pirate.wallet.sdk.rpc.BlockID
+	0,  // 1: pirate.wallet.sdk.rpc.BlockRange.end:type_name -> pirate.wallet.sdk.rpc.BlockID
+	0,  // 2: pirate.wallet.sdk.rpc.TxFilter.block:type_name -> pirate.wallet.sdk.rpc.BlockID
+	1,  // 3: pirate.wallet.sdk.rpc.TransparentAddressBlockFilter.range:type_name -> pirate.wallet.sdk.rpc.BlockRange
+	17, // 4: pirate.wallet.sdk.rpc.GetAddressUtxosReplyList.addressUtxos:type_name -> pirate.wallet.sdk.rpc.GetAddressUtxosReply
+	5,  // 5: pirate.wallet.sdk.rpc.CompactTxStreamer.GetLatestBlock:input_type -> pirate.wallet.sdk.rpc.ChainSpec
+	0,  // 6: pirate.wallet.sdk.rpc.CompactTxStreamer.GetBlock:input_type -> pirate.wallet.sdk.rpc.BlockID
+	1,  // 7: pirate.wallet.sdk.rpc.CompactTxStreamer.GetBlockRange:input_type -> pirate.wallet.sdk.rpc.BlockRange
+	19, // 8: pirate.wallet.sdk.rpc.CompactTxStreamer.GetZECPrice:input_type -> pirate.wallet.sdk.rpc.PriceRequest
+	6,  // 9: pirate.wallet.sdk.rpc.CompactTxStreamer.GetCurrentZECPrice:input_type -> pirate.wallet.sdk.rpc.Empty
+	2,  // 10: pirate.wallet.sdk.rpc.CompactTxStreamer.GetTransaction:input_type -> pirate.wallet.sdk.rpc.TxFilter
+	3,  // 11: pirate.wallet.sdk.rpc.CompactTxStreamer.SendTransaction:input_type -> pirate.wallet.sdk.rpc.RawTransaction
+	8,  // 12: pirate.wallet.sdk.rpc.CompactTxStreamer.GetTaddressTxids:input_type -> pirate.wallet.sdk.rpc.TransparentAddressBlockFilter
+	12, // 13: pirate.wallet.sdk.rpc.CompactTxStreamer.GetTaddressBalance:input_type -> pirate.wallet.sdk.rpc.AddressList
+	11, // 14: pirate.wallet.sdk.rpc.CompactTxStreamer.GetTaddressBalanceStream:input_type -> pirate.wallet.sdk.rpc.Address
+	14, // 15: pirate.wallet.sdk.rpc.CompactTxStreamer.GetMempoolTx:input_type -> pirate.wallet.sdk.rpc.Exclude
+	6,  // 16: pirate.wallet.sdk.rpc.CompactTxStreamer.GetMempoolStream:input_type -> pirate.wallet.sdk.rpc.Empty
+	0,  // 17: pirate.wallet.sdk.rpc.CompactTxStreamer.GetTreeState:input_type -> pirate.wallet.sdk.rpc.BlockID
+	16, // 18: pirate.wallet.sdk.rpc.CompactTxStreamer.GetAddressUtxos:input_type -> pirate.wallet.sdk.rpc.GetAddressUtxosArg
+	16, // 19: pirate.wallet.sdk.rpc.CompactTxStreamer.GetAddressUtxosStream:input_type -> pirate.wallet.sdk.rpc.GetAddressUtxosArg
+	6,  // 20: pirate.wallet.sdk.rpc.CompactTxStreamer.GetLightdInfo:input_type -> pirate.wallet.sdk.rpc.Empty
+	9,  // 21: pirate.wallet.sdk.rpc.CompactTxStreamer.Ping:input_type -> pirate.wallet.sdk.rpc.Duration
+	0,  // 22: pirate.wallet.sdk.rpc.CompactTxStreamer.GetLatestBlock:output_type -> pirate.wallet.sdk.rpc.BlockID
+	21, // 23: pirate.wallet.sdk.rpc.CompactTxStreamer.GetBlock:output_type -> pirate.wallet.sdk.rpc.CompactBlock
+	21, // 24: pirate.wallet.sdk.rpc.CompactTxStreamer.GetBlockRange:output_type -> pirate.wallet.sdk.rpc.CompactBlock
+	20, // 25: pirate.wallet.sdk.rpc.CompactTxStreamer.GetZECPrice:output_type -> pirate.wallet.sdk.rpc.PriceResponse
+	20, // 26: pirate.wallet.sdk.rpc.CompactTxStreamer.GetCurrentZECPrice:output_type -> pirate.wallet.sdk.rpc.PriceResponse
+	3,  // 27: pirate.wallet.sdk.rpc.CompactTxStreamer.GetTransaction:output_type -> pirate.wallet.sdk.rpc.RawTransaction
+	4,  // 28: pirate.wallet.sdk.rpc.CompactTxStreamer.SendTransaction:output_type -> pirate.wallet.sdk.rpc.SendResponse
+	3,  // 29: pirate.wallet.sdk.rpc.CompactTxStreamer.GetTaddressTxids:output_type -> pirate.wallet.sdk.rpc.RawTransaction
+	13, // 30: pirate.wallet.sdk.rpc.CompactTxStreamer.GetTaddressBalance:output_type -> pirate.wallet.sdk.rpc.Balance
+	13, // 31: pirate.wallet.sdk.rpc.CompactTxStreamer.GetTaddressBalanceStream:output_type -> pirate.wallet.sdk.rpc.Balance
+	22, // 32: pirate.wallet.sdk.rpc.CompactTxStreamer.GetMempoolTx:output_type -> pirate.wallet.sdk.rpc.CompactTx
+	3,  // 33: pirate.wallet.sdk.rpc.CompactTxStreamer.GetMempoolStream:output_type -> pirate.wallet.sdk.rpc.RawTransaction
+	15, // 34: pirate.wallet.sdk.rpc.CompactTxStreamer.GetTreeState:output_type -> pirate.wallet.sdk.rpc.TreeState
+	18, // 35: pirate.wallet.sdk.rpc.CompactTxStreamer.GetAddressUtxos:output_type -> pirate.wallet.sdk.rpc.GetAddressUtxosReplyList
+	17, // 36: pirate.wallet.sdk.rpc.CompactTxStreamer.GetAddressUtxosStream:output_type -> pirate.wallet.sdk.rpc.GetAddressUtxosReply
+	7,  // 37: pirate.wallet.sdk.rpc.CompactTxStreamer.GetLightdInfo:output_type -> pirate.wallet.sdk.rpc.LightdInfo
+	10, // 38: pirate.wallet.sdk.rpc.CompactTxStreamer.Ping:output_type -> pirate.wallet.sdk.rpc.PingResponse
 	22, // [22:39] is the sub-list for method output_type
 	5,  // [5:22] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name

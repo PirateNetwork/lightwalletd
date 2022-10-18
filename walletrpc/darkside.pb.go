@@ -467,39 +467,39 @@ func file_darkside_proto_rawDescGZIP() []byte {
 
 var file_darkside_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_darkside_proto_goTypes = []interface{}{
-	(*DarksideMetaState)(nil),       // 0: cash.z.wallet.sdk.rpc.DarksideMetaState
-	(*DarksideBlock)(nil),           // 1: cash.z.wallet.sdk.rpc.DarksideBlock
-	(*DarksideBlocksURL)(nil),       // 2: cash.z.wallet.sdk.rpc.DarksideBlocksURL
-	(*DarksideTransactionsURL)(nil), // 3: cash.z.wallet.sdk.rpc.DarksideTransactionsURL
-	(*DarksideHeight)(nil),          // 4: cash.z.wallet.sdk.rpc.DarksideHeight
-	(*DarksideEmptyBlocks)(nil),     // 5: cash.z.wallet.sdk.rpc.DarksideEmptyBlocks
-	(*RawTransaction)(nil),          // 6: cash.z.wallet.sdk.rpc.RawTransaction
-	(*Empty)(nil),                   // 7: cash.z.wallet.sdk.rpc.Empty
-	(*GetAddressUtxosReply)(nil),    // 8: cash.z.wallet.sdk.rpc.GetAddressUtxosReply
+	(*DarksideMetaState)(nil),       // 0: pirate.wallet.sdk.rpc.DarksideMetaState
+	(*DarksideBlock)(nil),           // 1: pirate.wallet.sdk.rpc.DarksideBlock
+	(*DarksideBlocksURL)(nil),       // 2: pirate.wallet.sdk.rpc.DarksideBlocksURL
+	(*DarksideTransactionsURL)(nil), // 3: pirate.wallet.sdk.rpc.DarksideTransactionsURL
+	(*DarksideHeight)(nil),          // 4: pirate.wallet.sdk.rpc.DarksideHeight
+	(*DarksideEmptyBlocks)(nil),     // 5: pirate.wallet.sdk.rpc.DarksideEmptyBlocks
+	(*RawTransaction)(nil),          // 6: pirate.wallet.sdk.rpc.RawTransaction
+	(*Empty)(nil),                   // 7: pirate.wallet.sdk.rpc.Empty
+	(*GetAddressUtxosReply)(nil),    // 8: pirate.wallet.sdk.rpc.GetAddressUtxosReply
 }
 var file_darkside_proto_depIdxs = []int32{
-	0,  // 0: cash.z.wallet.sdk.rpc.DarksideStreamer.Reset:input_type -> cash.z.wallet.sdk.rpc.DarksideMetaState
-	1,  // 1: cash.z.wallet.sdk.rpc.DarksideStreamer.StageBlocksStream:input_type -> cash.z.wallet.sdk.rpc.DarksideBlock
-	2,  // 2: cash.z.wallet.sdk.rpc.DarksideStreamer.StageBlocks:input_type -> cash.z.wallet.sdk.rpc.DarksideBlocksURL
-	5,  // 3: cash.z.wallet.sdk.rpc.DarksideStreamer.StageBlocksCreate:input_type -> cash.z.wallet.sdk.rpc.DarksideEmptyBlocks
-	6,  // 4: cash.z.wallet.sdk.rpc.DarksideStreamer.StageTransactionsStream:input_type -> cash.z.wallet.sdk.rpc.RawTransaction
-	3,  // 5: cash.z.wallet.sdk.rpc.DarksideStreamer.StageTransactions:input_type -> cash.z.wallet.sdk.rpc.DarksideTransactionsURL
-	4,  // 6: cash.z.wallet.sdk.rpc.DarksideStreamer.ApplyStaged:input_type -> cash.z.wallet.sdk.rpc.DarksideHeight
-	7,  // 7: cash.z.wallet.sdk.rpc.DarksideStreamer.GetIncomingTransactions:input_type -> cash.z.wallet.sdk.rpc.Empty
-	7,  // 8: cash.z.wallet.sdk.rpc.DarksideStreamer.ClearIncomingTransactions:input_type -> cash.z.wallet.sdk.rpc.Empty
-	8,  // 9: cash.z.wallet.sdk.rpc.DarksideStreamer.AddAddressUtxo:input_type -> cash.z.wallet.sdk.rpc.GetAddressUtxosReply
-	7,  // 10: cash.z.wallet.sdk.rpc.DarksideStreamer.ClearAddressUtxo:input_type -> cash.z.wallet.sdk.rpc.Empty
-	7,  // 11: cash.z.wallet.sdk.rpc.DarksideStreamer.Reset:output_type -> cash.z.wallet.sdk.rpc.Empty
-	7,  // 12: cash.z.wallet.sdk.rpc.DarksideStreamer.StageBlocksStream:output_type -> cash.z.wallet.sdk.rpc.Empty
-	7,  // 13: cash.z.wallet.sdk.rpc.DarksideStreamer.StageBlocks:output_type -> cash.z.wallet.sdk.rpc.Empty
-	7,  // 14: cash.z.wallet.sdk.rpc.DarksideStreamer.StageBlocksCreate:output_type -> cash.z.wallet.sdk.rpc.Empty
-	7,  // 15: cash.z.wallet.sdk.rpc.DarksideStreamer.StageTransactionsStream:output_type -> cash.z.wallet.sdk.rpc.Empty
-	7,  // 16: cash.z.wallet.sdk.rpc.DarksideStreamer.StageTransactions:output_type -> cash.z.wallet.sdk.rpc.Empty
-	7,  // 17: cash.z.wallet.sdk.rpc.DarksideStreamer.ApplyStaged:output_type -> cash.z.wallet.sdk.rpc.Empty
-	6,  // 18: cash.z.wallet.sdk.rpc.DarksideStreamer.GetIncomingTransactions:output_type -> cash.z.wallet.sdk.rpc.RawTransaction
-	7,  // 19: cash.z.wallet.sdk.rpc.DarksideStreamer.ClearIncomingTransactions:output_type -> cash.z.wallet.sdk.rpc.Empty
-	7,  // 20: cash.z.wallet.sdk.rpc.DarksideStreamer.AddAddressUtxo:output_type -> cash.z.wallet.sdk.rpc.Empty
-	7,  // 21: cash.z.wallet.sdk.rpc.DarksideStreamer.ClearAddressUtxo:output_type -> cash.z.wallet.sdk.rpc.Empty
+	0,  // 0: pirate.wallet.sdk.rpc.DarksideStreamer.Reset:input_type -> pirate.wallet.sdk.rpc.DarksideMetaState
+	1,  // 1: pirate.wallet.sdk.rpc.DarksideStreamer.StageBlocksStream:input_type -> pirate.wallet.sdk.rpc.DarksideBlock
+	2,  // 2: pirate.wallet.sdk.rpc.DarksideStreamer.StageBlocks:input_type -> pirate.wallet.sdk.rpc.DarksideBlocksURL
+	5,  // 3: pirate.wallet.sdk.rpc.DarksideStreamer.StageBlocksCreate:input_type -> pirate.wallet.sdk.rpc.DarksideEmptyBlocks
+	6,  // 4: pirate.wallet.sdk.rpc.DarksideStreamer.StageTransactionsStream:input_type -> pirate.wallet.sdk.rpc.RawTransaction
+	3,  // 5: pirate.wallet.sdk.rpc.DarksideStreamer.StageTransactions:input_type -> pirate.wallet.sdk.rpc.DarksideTransactionsURL
+	4,  // 6: pirate.wallet.sdk.rpc.DarksideStreamer.ApplyStaged:input_type -> pirate.wallet.sdk.rpc.DarksideHeight
+	7,  // 7: pirate.wallet.sdk.rpc.DarksideStreamer.GetIncomingTransactions:input_type -> pirate.wallet.sdk.rpc.Empty
+	7,  // 8: pirate.wallet.sdk.rpc.DarksideStreamer.ClearIncomingTransactions:input_type -> pirate.wallet.sdk.rpc.Empty
+	8,  // 9: pirate.wallet.sdk.rpc.DarksideStreamer.AddAddressUtxo:input_type -> pirate.wallet.sdk.rpc.GetAddressUtxosReply
+	7,  // 10: pirate.wallet.sdk.rpc.DarksideStreamer.ClearAddressUtxo:input_type -> pirate.wallet.sdk.rpc.Empty
+	7,  // 11: pirate.wallet.sdk.rpc.DarksideStreamer.Reset:output_type -> pirate.wallet.sdk.rpc.Empty
+	7,  // 12: pirate.wallet.sdk.rpc.DarksideStreamer.StageBlocksStream:output_type -> pirate.wallet.sdk.rpc.Empty
+	7,  // 13: pirate.wallet.sdk.rpc.DarksideStreamer.StageBlocks:output_type -> pirate.wallet.sdk.rpc.Empty
+	7,  // 14: pirate.wallet.sdk.rpc.DarksideStreamer.StageBlocksCreate:output_type -> pirate.wallet.sdk.rpc.Empty
+	7,  // 15: pirate.wallet.sdk.rpc.DarksideStreamer.StageTransactionsStream:output_type -> pirate.wallet.sdk.rpc.Empty
+	7,  // 16: pirate.wallet.sdk.rpc.DarksideStreamer.StageTransactions:output_type -> pirate.wallet.sdk.rpc.Empty
+	7,  // 17: pirate.wallet.sdk.rpc.DarksideStreamer.ApplyStaged:output_type -> pirate.wallet.sdk.rpc.Empty
+	6,  // 18: pirate.wallet.sdk.rpc.DarksideStreamer.GetIncomingTransactions:output_type -> pirate.wallet.sdk.rpc.RawTransaction
+	7,  // 19: pirate.wallet.sdk.rpc.DarksideStreamer.ClearIncomingTransactions:output_type -> pirate.wallet.sdk.rpc.Empty
+	7,  // 20: pirate.wallet.sdk.rpc.DarksideStreamer.AddAddressUtxo:output_type -> pirate.wallet.sdk.rpc.Empty
+	7,  // 21: pirate.wallet.sdk.rpc.DarksideStreamer.ClearAddressUtxo:output_type -> pirate.wallet.sdk.rpc.Empty
 	11, // [11:22] is the sub-list for method output_type
 	0,  // [0:11] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name

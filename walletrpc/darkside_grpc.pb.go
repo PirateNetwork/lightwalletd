@@ -97,7 +97,7 @@ func NewDarksideStreamerClient(cc grpc.ClientConnInterface) DarksideStreamerClie
 
 func (c *darksideStreamerClient) Reset(ctx context.Context, in *DarksideMetaState, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/Reset", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.DarksideStreamer/Reset", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (c *darksideStreamerClient) Reset(ctx context.Context, in *DarksideMetaStat
 }
 
 func (c *darksideStreamerClient) StageBlocksStream(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_StageBlocksStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &DarksideStreamer_ServiceDesc.Streams[0], "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocksStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &DarksideStreamer_ServiceDesc.Streams[0], "/pirate.wallet.sdk.rpc.DarksideStreamer/StageBlocksStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (x *darksideStreamerStageBlocksStreamClient) CloseAndRecv() (*Empty, error)
 
 func (c *darksideStreamerClient) StageBlocks(ctx context.Context, in *DarksideBlocksURL, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocks", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.DarksideStreamer/StageBlocks", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (c *darksideStreamerClient) StageBlocks(ctx context.Context, in *DarksideBl
 
 func (c *darksideStreamerClient) StageBlocksCreate(ctx context.Context, in *DarksideEmptyBlocks, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocksCreate", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.DarksideStreamer/StageBlocksCreate", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (c *darksideStreamerClient) StageBlocksCreate(ctx context.Context, in *Dark
 }
 
 func (c *darksideStreamerClient) StageTransactionsStream(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_StageTransactionsStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &DarksideStreamer_ServiceDesc.Streams[1], "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageTransactionsStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &DarksideStreamer_ServiceDesc.Streams[1], "/pirate.wallet.sdk.rpc.DarksideStreamer/StageTransactionsStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (x *darksideStreamerStageTransactionsStreamClient) CloseAndRecv() (*Empty, 
 
 func (c *darksideStreamerClient) StageTransactions(ctx context.Context, in *DarksideTransactionsURL, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageTransactions", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.DarksideStreamer/StageTransactions", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +201,7 @@ func (c *darksideStreamerClient) StageTransactions(ctx context.Context, in *Dark
 
 func (c *darksideStreamerClient) ApplyStaged(ctx context.Context, in *DarksideHeight, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/ApplyStaged", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.DarksideStreamer/ApplyStaged", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +209,7 @@ func (c *darksideStreamerClient) ApplyStaged(ctx context.Context, in *DarksideHe
 }
 
 func (c *darksideStreamerClient) GetIncomingTransactions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (DarksideStreamer_GetIncomingTransactionsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &DarksideStreamer_ServiceDesc.Streams[2], "/cash.z.wallet.sdk.rpc.DarksideStreamer/GetIncomingTransactions", opts...)
+	stream, err := c.cc.NewStream(ctx, &DarksideStreamer_ServiceDesc.Streams[2], "/pirate.wallet.sdk.rpc.DarksideStreamer/GetIncomingTransactions", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +242,7 @@ func (x *darksideStreamerGetIncomingTransactionsClient) Recv() (*RawTransaction,
 
 func (c *darksideStreamerClient) ClearIncomingTransactions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/ClearIncomingTransactions", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.DarksideStreamer/ClearIncomingTransactions", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func (c *darksideStreamerClient) ClearIncomingTransactions(ctx context.Context, 
 
 func (c *darksideStreamerClient) AddAddressUtxo(ctx context.Context, in *GetAddressUtxosReply, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/AddAddressUtxo", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.DarksideStreamer/AddAddressUtxo", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +260,7 @@ func (c *darksideStreamerClient) AddAddressUtxo(ctx context.Context, in *GetAddr
 
 func (c *darksideStreamerClient) ClearAddressUtxo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/ClearAddressUtxo", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.DarksideStreamer/ClearAddressUtxo", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +397,7 @@ func _DarksideStreamer_Reset_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/Reset",
+		FullMethod: "/pirate.wallet.sdk.rpc.DarksideStreamer/Reset",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DarksideStreamerServer).Reset(ctx, req.(*DarksideMetaState))
@@ -441,7 +441,7 @@ func _DarksideStreamer_StageBlocks_Handler(srv interface{}, ctx context.Context,
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocks",
+		FullMethod: "/pirate.wallet.sdk.rpc.DarksideStreamer/StageBlocks",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DarksideStreamerServer).StageBlocks(ctx, req.(*DarksideBlocksURL))
@@ -459,7 +459,7 @@ func _DarksideStreamer_StageBlocksCreate_Handler(srv interface{}, ctx context.Co
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocksCreate",
+		FullMethod: "/pirate.wallet.sdk.rpc.DarksideStreamer/StageBlocksCreate",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DarksideStreamerServer).StageBlocksCreate(ctx, req.(*DarksideEmptyBlocks))
@@ -503,7 +503,7 @@ func _DarksideStreamer_StageTransactions_Handler(srv interface{}, ctx context.Co
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageTransactions",
+		FullMethod: "/pirate.wallet.sdk.rpc.DarksideStreamer/StageTransactions",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DarksideStreamerServer).StageTransactions(ctx, req.(*DarksideTransactionsURL))
@@ -521,7 +521,7 @@ func _DarksideStreamer_ApplyStaged_Handler(srv interface{}, ctx context.Context,
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/ApplyStaged",
+		FullMethod: "/pirate.wallet.sdk.rpc.DarksideStreamer/ApplyStaged",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DarksideStreamerServer).ApplyStaged(ctx, req.(*DarksideHeight))
@@ -560,7 +560,7 @@ func _DarksideStreamer_ClearIncomingTransactions_Handler(srv interface{}, ctx co
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/ClearIncomingTransactions",
+		FullMethod: "/pirate.wallet.sdk.rpc.DarksideStreamer/ClearIncomingTransactions",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DarksideStreamerServer).ClearIncomingTransactions(ctx, req.(*Empty))
@@ -578,7 +578,7 @@ func _DarksideStreamer_AddAddressUtxo_Handler(srv interface{}, ctx context.Conte
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/AddAddressUtxo",
+		FullMethod: "/pirate.wallet.sdk.rpc.DarksideStreamer/AddAddressUtxo",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DarksideStreamerServer).AddAddressUtxo(ctx, req.(*GetAddressUtxosReply))
@@ -596,7 +596,7 @@ func _DarksideStreamer_ClearAddressUtxo_Handler(srv interface{}, ctx context.Con
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/ClearAddressUtxo",
+		FullMethod: "/pirate.wallet.sdk.rpc.DarksideStreamer/ClearAddressUtxo",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DarksideStreamerServer).ClearAddressUtxo(ctx, req.(*Empty))
@@ -608,7 +608,7 @@ func _DarksideStreamer_ClearAddressUtxo_Handler(srv interface{}, ctx context.Con
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var DarksideStreamer_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "cash.z.wallet.sdk.rpc.DarksideStreamer",
+	ServiceName: "pirate.wallet.sdk.rpc.DarksideStreamer",
 	HandlerType: (*DarksideStreamerServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

@@ -75,7 +75,7 @@ func NewCompactTxStreamerClient(cc grpc.ClientConnInterface) CompactTxStreamerCl
 
 func (c *compactTxStreamerClient) GetLatestBlock(ctx context.Context, in *ChainSpec, opts ...grpc.CallOption) (*BlockID, error) {
 	out := new(BlockID)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetLatestBlock", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetLatestBlock", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (c *compactTxStreamerClient) GetLatestBlock(ctx context.Context, in *ChainS
 
 func (c *compactTxStreamerClient) GetBlock(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*CompactBlock, error) {
 	out := new(CompactBlock)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetBlock", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetBlock", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (c *compactTxStreamerClient) GetBlock(ctx context.Context, in *BlockID, opt
 }
 
 func (c *compactTxStreamerClient) GetBlockRange(ctx context.Context, in *BlockRange, opts ...grpc.CallOption) (CompactTxStreamer_GetBlockRangeClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[0], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetBlockRange", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[0], "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetBlockRange", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (x *compactTxStreamerGetBlockRangeClient) Recv() (*CompactBlock, error) {
 
 func (c *compactTxStreamerClient) GetZECPrice(ctx context.Context, in *PriceRequest, opts ...grpc.CallOption) (*PriceResponse, error) {
 	out := new(PriceResponse)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetZECPrice", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetZECPrice", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func (c *compactTxStreamerClient) GetZECPrice(ctx context.Context, in *PriceRequ
 
 func (c *compactTxStreamerClient) GetCurrentZECPrice(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PriceResponse, error) {
 	out := new(PriceResponse)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetCurrentZECPrice", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetCurrentZECPrice", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (c *compactTxStreamerClient) GetCurrentZECPrice(ctx context.Context, in *Em
 
 func (c *compactTxStreamerClient) GetTransaction(ctx context.Context, in *TxFilter, opts ...grpc.CallOption) (*RawTransaction, error) {
 	out := new(RawTransaction)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTransaction", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetTransaction", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func (c *compactTxStreamerClient) GetTransaction(ctx context.Context, in *TxFilt
 
 func (c *compactTxStreamerClient) SendTransaction(ctx context.Context, in *RawTransaction, opts ...grpc.CallOption) (*SendResponse, error) {
 	out := new(SendResponse)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/SendTransaction", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.CompactTxStreamer/SendTransaction", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func (c *compactTxStreamerClient) SendTransaction(ctx context.Context, in *RawTr
 }
 
 func (c *compactTxStreamerClient) GetTaddressTxids(ctx context.Context, in *TransparentAddressBlockFilter, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressTxidsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[1], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTaddressTxids", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[1], "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetTaddressTxids", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (x *compactTxStreamerGetTaddressTxidsClient) Recv() (*RawTransaction, error
 
 func (c *compactTxStreamerClient) GetTaddressBalance(ctx context.Context, in *AddressList, opts ...grpc.CallOption) (*Balance, error) {
 	out := new(Balance)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTaddressBalance", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetTaddressBalance", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +201,7 @@ func (c *compactTxStreamerClient) GetTaddressBalance(ctx context.Context, in *Ad
 }
 
 func (c *compactTxStreamerClient) GetTaddressBalanceStream(ctx context.Context, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressBalanceStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[2], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTaddressBalanceStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[2], "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetTaddressBalanceStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func (x *compactTxStreamerGetTaddressBalanceStreamClient) CloseAndRecv() (*Balan
 }
 
 func (c *compactTxStreamerClient) GetMempoolTx(ctx context.Context, in *Exclude, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolTxClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[3], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetMempoolTx", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[3], "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetMempoolTx", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +267,7 @@ func (x *compactTxStreamerGetMempoolTxClient) Recv() (*CompactTx, error) {
 }
 
 func (c *compactTxStreamerClient) GetMempoolStream(ctx context.Context, in *Empty, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[4], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetMempoolStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[4], "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetMempoolStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +300,7 @@ func (x *compactTxStreamerGetMempoolStreamClient) Recv() (*RawTransaction, error
 
 func (c *compactTxStreamerClient) GetTreeState(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*TreeState, error) {
 	out := new(TreeState)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTreeState", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetTreeState", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +309,7 @@ func (c *compactTxStreamerClient) GetTreeState(ctx context.Context, in *BlockID,
 
 func (c *compactTxStreamerClient) GetAddressUtxos(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (*GetAddressUtxosReplyList, error) {
 	out := new(GetAddressUtxosReplyList)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxos", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxos", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +317,7 @@ func (c *compactTxStreamerClient) GetAddressUtxos(ctx context.Context, in *GetAd
 }
 
 func (c *compactTxStreamerClient) GetAddressUtxosStream(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (CompactTxStreamer_GetAddressUtxosStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[5], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxosStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[5], "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxosStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -350,7 +350,7 @@ func (x *compactTxStreamerGetAddressUtxosStreamClient) Recv() (*GetAddressUtxosR
 
 func (c *compactTxStreamerClient) GetLightdInfo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*LightdInfo, error) {
 	out := new(LightdInfo)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetLightdInfo", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetLightdInfo", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +359,7 @@ func (c *compactTxStreamerClient) GetLightdInfo(ctx context.Context, in *Empty, 
 
 func (c *compactTxStreamerClient) Ping(ctx context.Context, in *Duration, opts ...grpc.CallOption) (*PingResponse, error) {
 	out := new(PingResponse)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/Ping", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.CompactTxStreamer/Ping", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -492,7 +492,7 @@ func _CompactTxStreamer_GetLatestBlock_Handler(srv interface{}, ctx context.Cont
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetLatestBlock",
+		FullMethod: "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetLatestBlock",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CompactTxStreamerServer).GetLatestBlock(ctx, req.(*ChainSpec))
@@ -510,7 +510,7 @@ func _CompactTxStreamer_GetBlock_Handler(srv interface{}, ctx context.Context, d
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetBlock",
+		FullMethod: "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetBlock",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CompactTxStreamerServer).GetBlock(ctx, req.(*BlockID))
@@ -549,7 +549,7 @@ func _CompactTxStreamer_GetZECPrice_Handler(srv interface{}, ctx context.Context
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetZECPrice",
+		FullMethod: "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetZECPrice",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CompactTxStreamerServer).GetZECPrice(ctx, req.(*PriceRequest))
@@ -567,7 +567,7 @@ func _CompactTxStreamer_GetCurrentZECPrice_Handler(srv interface{}, ctx context.
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetCurrentZECPrice",
+		FullMethod: "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetCurrentZECPrice",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CompactTxStreamerServer).GetCurrentZECPrice(ctx, req.(*Empty))
@@ -585,7 +585,7 @@ func _CompactTxStreamer_GetTransaction_Handler(srv interface{}, ctx context.Cont
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTransaction",
+		FullMethod: "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetTransaction",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CompactTxStreamerServer).GetTransaction(ctx, req.(*TxFilter))
@@ -603,7 +603,7 @@ func _CompactTxStreamer_SendTransaction_Handler(srv interface{}, ctx context.Con
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/SendTransaction",
+		FullMethod: "/pirate.wallet.sdk.rpc.CompactTxStreamer/SendTransaction",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CompactTxStreamerServer).SendTransaction(ctx, req.(*RawTransaction))
@@ -642,7 +642,7 @@ func _CompactTxStreamer_GetTaddressBalance_Handler(srv interface{}, ctx context.
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTaddressBalance",
+		FullMethod: "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetTaddressBalance",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CompactTxStreamerServer).GetTaddressBalance(ctx, req.(*AddressList))
@@ -728,7 +728,7 @@ func _CompactTxStreamer_GetTreeState_Handler(srv interface{}, ctx context.Contex
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTreeState",
+		FullMethod: "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetTreeState",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CompactTxStreamerServer).GetTreeState(ctx, req.(*BlockID))
@@ -746,7 +746,7 @@ func _CompactTxStreamer_GetAddressUtxos_Handler(srv interface{}, ctx context.Con
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxos",
+		FullMethod: "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxos",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CompactTxStreamerServer).GetAddressUtxos(ctx, req.(*GetAddressUtxosArg))
@@ -785,7 +785,7 @@ func _CompactTxStreamer_GetLightdInfo_Handler(srv interface{}, ctx context.Conte
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetLightdInfo",
+		FullMethod: "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetLightdInfo",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CompactTxStreamerServer).GetLightdInfo(ctx, req.(*Empty))
@@ -803,7 +803,7 @@ func _CompactTxStreamer_Ping_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/Ping",
+		FullMethod: "/pirate.wallet.sdk.rpc.CompactTxStreamer/Ping",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CompactTxStreamerServer).Ping(ctx, req.(*Duration))
@@ -815,7 +815,7 @@ func _CompactTxStreamer_Ping_Handler(srv interface{}, ctx context.Context, dec f
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var CompactTxStreamer_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "cash.z.wallet.sdk.rpc.CompactTxStreamer",
+	ServiceName: "pirate.wallet.sdk.rpc.CompactTxStreamer",
 	HandlerType: (*CompactTxStreamerServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

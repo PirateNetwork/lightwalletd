@@ -479,17 +479,17 @@ func file_compact_formats_proto_rawDescGZIP() []byte {
 
 var file_compact_formats_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_compact_formats_proto_goTypes = []interface{}{
-	(*CompactBlock)(nil),         // 0: cash.z.wallet.sdk.rpc.CompactBlock
-	(*CompactTx)(nil),            // 1: cash.z.wallet.sdk.rpc.CompactTx
-	(*CompactSaplingSpend)(nil),  // 2: cash.z.wallet.sdk.rpc.CompactSaplingSpend
-	(*CompactSaplingOutput)(nil), // 3: cash.z.wallet.sdk.rpc.CompactSaplingOutput
-	(*CompactOrchardAction)(nil), // 4: cash.z.wallet.sdk.rpc.CompactOrchardAction
+	(*CompactBlock)(nil),         // 0: pirate.wallet.sdk.rpc.CompactBlock
+	(*CompactTx)(nil),            // 1: pirate.wallet.sdk.rpc.CompactTx
+	(*CompactSaplingSpend)(nil),  // 2: pirate.wallet.sdk.rpc.CompactSaplingSpend
+	(*CompactSaplingOutput)(nil), // 3: pirate.wallet.sdk.rpc.CompactSaplingOutput
+	(*CompactOrchardAction)(nil), // 4: pirate.wallet.sdk.rpc.CompactOrchardAction
 }
 var file_compact_formats_proto_depIdxs = []int32{
-	1, // 0: cash.z.wallet.sdk.rpc.CompactBlock.vtx:type_name -> cash.z.wallet.sdk.rpc.CompactTx
-	2, // 1: cash.z.wallet.sdk.rpc.CompactTx.spends:type_name -> cash.z.wallet.sdk.rpc.CompactSaplingSpend
-	3, // 2: cash.z.wallet.sdk.rpc.CompactTx.outputs:type_name -> cash.z.wallet.sdk.rpc.CompactSaplingOutput
-	4, // 3: cash.z.wallet.sdk.rpc.CompactTx.actions:type_name -> cash.z.wallet.sdk.rpc.CompactOrchardAction
+	1, // 0: pirate.wallet.sdk.rpc.CompactBlock.vtx:type_name -> pirate.wallet.sdk.rpc.CompactTx
+	2, // 1: pirate.wallet.sdk.rpc.CompactTx.spends:type_name -> pirate.wallet.sdk.rpc.CompactSaplingSpend
+	3, // 2: pirate.wallet.sdk.rpc.CompactTx.outputs:type_name -> pirate.wallet.sdk.rpc.CompactSaplingOutput
+	4, // 3: pirate.wallet.sdk.rpc.CompactTx.actions:type_name -> pirate.wallet.sdk.rpc.CompactOrchardAction
 	4, // [4:4] is the sub-list for method output_type
 	4, // [4:4] is the sub-list for method input_type
 	4, // [4:4] is the sub-list for extension type_name
