@@ -76,7 +76,10 @@ func fetchAPIPrice(url string, resultPath []string) (float64, error) {
 }
 
 func fetchCoinGeckoPrice() (float64, error) {
-	return fetchAPIPrice("https://api.coingecko.com/api/v3/simple/price?ids=pirate-chain&vs_currencies=usd", []string{"pirate-chain","usd"})
+	ts := time.Now()
+	dt := ts.Format("2006-01-02") // ISO 8601
+	url := fmt.Sprintf("https://api.coingecko.com/api/v3/coins/pirate-chain/history?date=%s&localization=false", dt)
+	return fetchAPIPrice(url, []string{"market_data", "current_price", "usd"})
 }
 
 func fetchHistoricalCoinbasePrice(ts *time.Time, resultPath []string) (float64, error) {
