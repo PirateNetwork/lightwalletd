@@ -128,9 +128,9 @@ func startServer(opts *common.Options) error {
 	promRegistry.MustRegister(common.Metrics.TotalSaplingParamsCounter)
 	promRegistry.MustRegister(common.Metrics.TotalSproutParamsCounter)
 	promRegistry.MustRegister(common.Metrics.MempoolClientsGauge)
-	promRegistry.MustRegister(common.Metrics.ZecPriceGauge)
-	promRegistry.MustRegister(common.Metrics.ZecPriceHistoryWebAPICounter)
-	promRegistry.MustRegister(common.Metrics.ZecPriceHistoryErrors)
+	promRegistry.MustRegister(common.Metrics.ArrrPriceGauge)
+	promRegistry.MustRegister(common.Metrics.ArrrPriceHistoryWebAPICounter)
+	promRegistry.MustRegister(common.Metrics.ArrrPriceHistoryErrors)
 
 	logger.SetLevel(logrus.Level(opts.LogLevel))
 

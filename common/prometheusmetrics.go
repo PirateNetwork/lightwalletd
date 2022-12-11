@@ -11,9 +11,9 @@ type PrometheusMetrics struct {
 	TotalSaplingParamsCounter    prometheus.Counter
 	TotalSproutParamsCounter     prometheus.Counter
 	MempoolClientsGauge          prometheus.Gauge
-	ZecPriceGauge                prometheus.Gauge
-	ZecPriceHistoryWebAPICounter prometheus.Counter
-	ZecPriceHistoryErrors        prometheus.Counter
+	ArrrPriceGauge                prometheus.Gauge
+	ArrrPriceHistoryWebAPICounter prometheus.Counter
+	ArrrPriceHistoryErrors        prometheus.Counter
 }
 
 func GetPrometheusMetrics() *PrometheusMetrics {
@@ -58,18 +58,18 @@ func GetPrometheusMetrics() *PrometheusMetrics {
 		Help: "Number of concurrent mempool clients",
 	})
 
-	m.ZecPriceGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "zec_price",
-		Help: "Current price of Zec",
+	m.ArrrPriceGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "arrr_price",
+		Help: "Current price of Arrr",
 	})
 
-	m.ZecPriceHistoryWebAPICounter = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "zec_price_history_api_counter",
+	m.ArrrPriceHistoryWebAPICounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "arrr_price_history_api_counter",
 		Help: "Counter of number of successful API calls to history API",
 	})
 
-	m.ZecPriceHistoryErrors = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "zec_price_history_errors",
+	m.ArrrPriceHistoryErrors = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "arrr_price_history_errors",
 		Help: "Counter for number of errors seen in the history price API",
 	})
 

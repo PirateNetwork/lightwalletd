@@ -154,7 +154,7 @@ message PriceResponse {
     // 3-letter currency code, matching the request
     string currency = 2;
 
-    // price of ZEC
+    // price of Arrr
     double price = 3;
 }
 
@@ -167,8 +167,8 @@ service CompactTxStreamer {
     rpc GetBlockRange(BlockRange) returns (stream CompactBlock) {}
 
     // Get the historical and current prices
-    rpc GetZECPrice(PriceRequest) returns (PriceResponse) {}
-    rpc GetCurrentZECPrice(Empty) returns (PriceResponse) {}
+    rpc GetARRRPrice(PriceRequest) returns (PriceResponse) {}
+    rpc GetCurrentARRRPrice(Empty) returns (PriceResponse) {}
 
     // Return the requested full (not compact) transaction (as from pirated)
     rpc GetTransaction(TxFilter) returns (RawTransaction) {}

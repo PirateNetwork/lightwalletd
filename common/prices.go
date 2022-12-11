@@ -75,22 +75,13 @@ func fetchAPIPrice(url string, resultPath []string) (float64, error) {
 	return -1, errors.New("path didn't result in lookup")
 }
 
-func fetchCoinbasePrice() (float64, error) {
-	return fetchAPIPrice("https://api.coinbase.com/v2/exchange-rates?currency=ZEC", []string{"data", "rates", "USD"})
-
+func fetchCoinGeckoPrice() (float64, error) {
+	return fetchAPIPrice("https://api.coingecko.com/api/v3/simple/price?ids=pirate-chain&vs_currencies=usd", []string{"pirate-chain","usd"})
 }
 
-func fetchCoinCapPrice() (float64, error) {
-	return fetchAPIPrice("https://api.coincap.io/v2/rates/zcash", []string{"data", "rateUsd"})
-}
-
-func fetchBinancePrice() (float64, error) {
-	return fetchAPIPrice("https://api.binance.com/api/v3/avgPrice?symbol=ZECUSDC", []string{"price"})
-}
-
-func fetchHistoricalCoinbasePrice(ts *time.Time) (float64, error) {
+func fetchHistoricalCoinbasePrice(ts *time.Time, resultPath []string) (float64, error) {
 	dt := ts.Format("2006-01-02") // ISO 8601
-	url := fmt.Sprintf("https://api.pro.coinbase.com/products/ZEC-USDC/candles?start=%sT00:00:00&end=%sT00:00:00&granularity=86400", dt, dt)
+	url := fmt.Sprintf("https://api.coingecko.com/api/v3/coins/pirate-chain/history?date=%s&localization=false", dt)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -103,17 +94,30 @@ func fetchHistoricalCoinbasePrice(ts *time.Time) (float64, error) {
 		return -1, err
 	}
 
-	var prices [][]float64
-	err = json.Unmarshal(body, &prices)
-	if err != nil {
-		return -1, err
+	var priceJSON map[string]interface{}
+	json.Unmarshal(body, &priceJSON)
+
+	for i := 0; i < len(resultPath); i++ {
+		d, ok := priceJSON[resultPath[i]]
+		if !ok {
+			return -1, fmt.Errorf("API error: couldn't find '%s'", resultPath[i])
+		}
+
+		switch v := d.(type) {
+		case float64:
+			return v, nil
+		case string:
+			{
+				price, err := strconv.ParseFloat(v, 64)
+				return price, err
+			}
+
+		case map[string]interface{}:
+			priceJSON = v
+		}
 	}
 
-	if len(prices) == 0 || len(prices[0]) < 5 {
-		return -1, nil
-	}
-
-	return prices[0][4], nil
+	return -1, errors.New("path didn't result in lookup")
 }
 
 // Median gets the median number in a slice of numbers
@@ -142,7 +146,7 @@ func median(inp []float64) (median float64) {
 // concensus price
 func fetchPriceFromWebAPI() (float64, error) {
 	// We'll fetch prices from all our endpoints, and use the median price from that
-	priceProviders := []func() (float64, error){fetchBinancePrice, fetchCoinCapPrice, fetchCoinbasePrice}
+	priceProviders := []func() (float64, error){fetchCoinGeckoPrice}
 
 	ch := make(chan float64)
 
@@ -330,7 +334,7 @@ func GetHistoricalPrice(ts *time.Time) (float64, *time.Time, error) {
 	}
 
 	// Fetch price from web API
-	price, err := fetchHistoricalCoinbasePrice(ts)
+	price, err := fetchHistoricalCoinbasePrice(ts, []string{"market_data", "current_price", "usd"})
 	if err != nil {
 		Log.Errorf("Couldn't read historical prices from Coingecko: %v", err)
 		return -1, nil, err
@@ -359,7 +363,7 @@ func addHistoricalPrice(price float64, ts *time.Time) {
 		defer pricesRwMutex.Unlock()
 
 		// Increment success counter
-		Metrics.ZecPriceHistoryWebAPICounter.Inc()
+		Metrics.ArrrPriceHistoryWebAPICounter.Inc()
 
 		go Log.WithFields(logrus.Fields{
 			"method": "HistoricalPrice",
