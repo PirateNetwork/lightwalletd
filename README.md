@@ -14,7 +14,7 @@ The Lightwalletd Server is experimental and a work in progress. Use it at your o
 
 # Overview
 
-ARRRwallet lightwalletd is a fork of [lightwalletd](https://github.com/adityapk00/lightwalletd) from the ECC. 
+ARRRwallet lightwalletd is a fork of [lightwalletd](https://github.com/adityapk00/lightwalletd) from the ECC.
 
 It is a backend service that provides a bandwidth-efficient interface to the PIRATE blockchain for the ARRRwallet light wallet.
 
@@ -41,10 +41,12 @@ rpcbind=127.0.0.1
 rpcport=45453
 experimentalfeatures=1
 txindex=1
-insightexplorer=1
+addressindex=1
+timestampindex=1
+spentindex=1
 ```
 
-You might need to run with `-reindex` the first time if you are enabling the `txindex` or `insightexplorer` options for the first time. The reindex might take a while. If you are using it on testnet, please also include `testnet=1`
+You might need to run with `-reindex` the first time if you are enabling the any of the index options (`txindex`,`addressindex`,`timestampindex`, `spentindex`) for the first time. The reindex will take a while. If you are using it on testnet, please also include `testnet=1`
 
 #### 2. Get a TLS certificate
 
@@ -55,11 +57,11 @@ Create a new section for the NGINX reverse proxy:
 ```
 server {
     listen 443 ssl http2;
- 
- 
+
+
     ssl_certificate     ssl/cert.pem; # From certbot
     ssl_certificate_key ssl/key.pem;  # From certbot
-    
+
     location / {
         # Replace localhost:9067 with the address and port of your gRPC server if using a custom port
         grpc_pass grpc://localhost:9067;
