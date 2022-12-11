@@ -55,6 +55,7 @@ func fetchAPIPrice(url string, resultPath []string) (float64, error) {
 	for i := 0; i < len(resultPath); i++ {
 		d, ok := priceJSON[resultPath[i]]
 		if !ok {
+			Log.Info(string(body))
 			return -1, fmt.Errorf("API error: couldn't find '%s'", resultPath[i])
 		}
 
@@ -80,6 +81,14 @@ func fetchCoinGeckoPrice() (float64, error) {
 	dt := ts.Format("2006-01-02") // ISO 8601
 	url := fmt.Sprintf("https://api.coingecko.com/api/v3/coins/pirate-chain/history?date=%s&localization=false", dt)
 	return fetchAPIPrice(url, []string{"market_data", "current_price", "usd"})
+}
+
+func fetchCoinCapPrice() (float64, error) {
+	return fetchAPIPrice("https://api.coincap.io/v2/assets/pirate-chain", []string{"data", "priceUsd", "usd"})
+}
+
+func fetchCryptoComparePrice() (float64, error) {
+	return fetchAPIPrice("https://min-api.cryptocompare.com/data/price?fsym=ARRR&tsyms=USD", []string{"USD"})
 }
 
 func fetchHistoricalCoinbasePrice(ts *time.Time, resultPath []string) (float64, error) {
@@ -149,7 +158,7 @@ func median(inp []float64) (median float64) {
 // concensus price
 func fetchPriceFromWebAPI() (float64, error) {
 	// We'll fetch prices from all our endpoints, and use the median price from that
-	priceProviders := []func() (float64, error){fetchCoinGeckoPrice}
+	priceProviders := []func() (float64, error){fetchCoinGeckoPrice,fetchCoinCapPrice,fetchCryptoComparePrice}
 
 	ch := make(chan float64)
 
