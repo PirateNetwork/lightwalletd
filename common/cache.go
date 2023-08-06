@@ -384,7 +384,7 @@ func (c *BlockCache) GetLiteWalletBlockGroup(height int, lastHeight int) *wallet
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	targetLength := 400000
+	targetLength := 4000000
 	groupLength := 0
 
 	for groupLength < targetLength {
