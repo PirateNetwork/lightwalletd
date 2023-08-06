@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CompactTxStreamerClient interface {
+	GetLiteWalletBlockGroup(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*BlockID, error)
 	// Return the height of the tip of the best chain
 	GetLatestBlock(ctx context.Context, in *ChainSpec, opts ...grpc.CallOption) (*BlockID, error)
 	// Return the compact block corresponding to the given block identifier
@@ -71,6 +72,15 @@ type compactTxStreamerClient struct {
 
 func NewCompactTxStreamerClient(cc grpc.ClientConnInterface) CompactTxStreamerClient {
 	return &compactTxStreamerClient{cc}
+}
+
+func (c *compactTxStreamerClient) GetLiteWalletBlockGroup(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*BlockID, error) {
+	out := new(BlockID)
+	err := c.cc.Invoke(ctx, "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetLiteWalletBlockGroup", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *compactTxStreamerClient) GetLatestBlock(ctx context.Context, in *ChainSpec, opts ...grpc.CallOption) (*BlockID, error) {
@@ -370,6 +380,7 @@ func (c *compactTxStreamerClient) Ping(ctx context.Context, in *Duration, opts .
 // All implementations must embed UnimplementedCompactTxStreamerServer
 // for forward compatibility
 type CompactTxStreamerServer interface {
+	GetLiteWalletBlockGroup(context.Context, *BlockID) (*BlockID, error)
 	// Return the height of the tip of the best chain
 	GetLatestBlock(context.Context, *ChainSpec) (*BlockID, error)
 	// Return the compact block corresponding to the given block identifier
@@ -418,6 +429,9 @@ type CompactTxStreamerServer interface {
 type UnimplementedCompactTxStreamerServer struct {
 }
 
+func (UnimplementedCompactTxStreamerServer) GetLiteWalletBlockGroup(context.Context, *BlockID) (*BlockID, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLiteWalletBlockGroup not implemented")
+}
 func (UnimplementedCompactTxStreamerServer) GetLatestBlock(context.Context, *ChainSpec) (*BlockID, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLatestBlock not implemented")
 }
@@ -480,6 +494,24 @@ type UnsafeCompactTxStreamerServer interface {
 
 func RegisterCompactTxStreamerServer(s grpc.ServiceRegistrar, srv CompactTxStreamerServer) {
 	s.RegisterService(&CompactTxStreamer_ServiceDesc, srv)
+}
+
+func _CompactTxStreamer_GetLiteWalletBlockGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlockID)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CompactTxStreamerServer).GetLiteWalletBlockGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pirate.wallet.sdk.rpc.CompactTxStreamer/GetLiteWalletBlockGroup",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CompactTxStreamerServer).GetLiteWalletBlockGroup(ctx, req.(*BlockID))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _CompactTxStreamer_GetLatestBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -818,6 +850,10 @@ var CompactTxStreamer_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "pirate.wallet.sdk.rpc.CompactTxStreamer",
 	HandlerType: (*CompactTxStreamerServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetLiteWalletBlockGroup",
+			Handler:    _CompactTxStreamer_GetLiteWalletBlockGroup_Handler,
+		},
 		{
 			MethodName: "GetLatestBlock",
 			Handler:    _CompactTxStreamer_GetLatestBlock_Handler,

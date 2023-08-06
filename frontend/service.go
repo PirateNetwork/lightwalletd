@@ -129,6 +129,19 @@ func (s *lwdStreamer) GetCurrentARRRPrice(ctx context.Context, in *walletrpc.Emp
 	return resp, nil
 }
 
+
+// Returns the last block in a group of predefined total size
+func (s *lwdStreamer) GetLiteWalletBlockGroup(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.BlockID, error) {
+	latestBlock := s.cache.GetLatestHeight()
+
+	if latestBlock == -1 {
+		return nil, errors.New("Cache is empty. Server is probably not yet ready")
+	}
+
+  blockId := s.cache.GetLiteWalletBlockGroup(int(id.Height), int(latestBlock))
+	return blockId, nil
+}
+
 // GetLatestBlock returns the height of the best chain, according to zcashd.
 func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
 	latestBlock := s.cache.GetLatestHeight()
