@@ -394,7 +394,7 @@ func (c *BlockCache) GetLiteWalletBlockGroup(height int) *walletrpc.BlockID {
 	groupLength := 0
 
 	if height < c.firstBlock || height >= c.nextBlock {
-		return nil
+			return &walletrpc.BlockID{Height: uint64(c.nextBlock-1), Hash: c.latestHash}
 	}
 
 	for groupLength < targetLength {
