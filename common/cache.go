@@ -380,19 +380,23 @@ func (c *BlockCache) Get(height int) *walletrpc.CompactBlock {
 
 // GetLatestHeight returns the height of the most recent block, or -1
 // if the cache is empty.
-func (c *BlockCache) GetLiteWalletBlockGroup(height int, lastHeight int) *walletrpc.BlockID {
+func (c *BlockCache) GetLiteWalletBlockGroup(height int) *walletrpc.BlockID {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
 	targetLength := 4000000
 	groupLength := 0
 
+	if height < c.firstBlock || height >= c.nextBlock {
+		return nil
+	}
+
 	for groupLength < targetLength {
 		 	groupLength += c.blockLength(height)
 			height++
-			if height > lastHeight {
-				height = lastHeight
-				break
+			if height >= c.nextBlock {
+					height--
+					break
 			}
 	}
 

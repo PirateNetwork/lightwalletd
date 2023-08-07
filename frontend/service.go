@@ -135,10 +135,14 @@ func (s *lwdStreamer) GetLiteWalletBlockGroup(ctx context.Context, id *walletrpc
 	latestBlock := s.cache.GetLatestHeight()
 
 	if latestBlock == -1 {
-		return nil, errors.New("Cache is empty. Server is probably not yet ready")
+			return nil, errors.New("Cache is empty. Server is probably not yet ready")
 	}
 
-  blockId := s.cache.GetLiteWalletBlockGroup(int(id.Height), int(latestBlock))
+	if int(id.Height) < 1	{
+			return nil, errors.New("Invalid block, must use height greater than 0")
+	}
+
+  blockId := s.cache.GetLiteWalletBlockGroup(int(id.Height))
 	return blockId, nil
 }
 
