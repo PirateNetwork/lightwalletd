@@ -122,6 +122,12 @@ func (c *BlockCache) recoverFromCorruption(height int) {
 
 // not including the checksum
 func (c *BlockCache) blockLength(height int) int {
+
+	//Don't check block that will be out of index
+	if height < c.firstBlock || height >= c.nextBlock {
+		return 0
+	}
+
 	index := height - c.firstBlock
 	return int(c.starts[index+1] - c.starts[index] - 8)
 }
