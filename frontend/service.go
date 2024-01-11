@@ -381,10 +381,16 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		if gettreestateReply.Sapling.Commitments.FinalState != "" {
 			break
 		}
+		if gettreestateReply.SaplingFrontier.Commitments.FinalState != "" {
+			break
+		}
 		if gettreestateReply.Sapling.SkipHash == "" {
 			break
 		}
-		hashJSON, err = json.Marshal(gettreestateReply.Sapling.SkipHash)
+		if gettreestateReply.SaplingFrontier.SkipHash == "" {
+			break
+		}
+		hashJSON, err = json.Marshal(gettreestateReply.SaplingFrontier.SkipHash)
 		if err != nil {
 			return nil, err
 		}
@@ -393,13 +399,17 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 	if gettreestateReply.Sapling.Commitments.FinalState == "" {
 		return nil, errors.New("pirated did not return treestate")
 	}
+	if gettreestateReply.SaplingFrontier.Commitments.FinalState == "" {
+		return nil, errors.New("pirated did not return frontierstate")
+	}
 	return &walletrpc.TreeState{
-		Network:     s.chainName,
-		Height:      uint64(gettreestateReply.Height),
-		Hash:        gettreestateReply.Hash,
-		Time:        gettreestateReply.Time,
-		SaplingTree: gettreestateReply.Sapling.Commitments.FinalState,
-		OrchardTree: gettreestateReply.Orchard.Commitments.FinalState,
+		Network:     				s.chainName,
+		Height:      				uint64(gettreestateReply.Height),
+		Hash:        				gettreestateReply.Hash,
+		Time:        				gettreestateReply.Time,
+		SaplingTree: 				gettreestateReply.Sapling.Commitments.FinalState,
+		SaplingFrontier: 		gettreestateReply.SaplingFrontier.Commitments.FinalState,
+		OrchardTree: 				gettreestateReply.Orchard.Commitments.FinalState,
 	}, nil
 }
 

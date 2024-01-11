@@ -116,7 +116,8 @@ message TreeState {
     string hash = 3;        // block id
     uint32 time = 4;        // Unix epoch time when the block was mined
     string saplingTree = 5; // sapling commitment tree state
-    string orchardTree = 6; // orchard commitment tree state
+    string saplingFrontier = 6; // sapling commitment tree state
+    string orchardTree = 7; // orchard commitment tree state
 }
 
 // Results are sorted by height, which makes it easy to issue another

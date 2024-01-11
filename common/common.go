@@ -117,6 +117,12 @@ type (
 			}
 			SkipHash string
 		}
+		SaplingFrontier struct {
+			Commitments struct {
+				FinalState string
+			}
+			SkipHash string
+		}
 		Orchard struct {
 			Commitments struct {
 				FinalState string
