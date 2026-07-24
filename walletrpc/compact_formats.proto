@@ -40,6 +40,8 @@ message CompactTx {
 
     repeated CompactSaplingSpend spends = 4;   // inputs
     repeated CompactSaplingOutput outputs = 5; // outputs
+    // Pirate uses this field for the single Orchard-circuit pool: Orchard in
+    // legacy v5 transactions and Ironwood in v6 transactions.
     repeated CompactOrchardAction actions = 6;
 }
 
@@ -57,8 +59,7 @@ message CompactSaplingOutput {
     bytes ciphertext = 3;   // first 52 bytes of ciphertext
 }
 
-// https://github.com/zcash/zips/blob/main/zip-0225.rst#orchard-action-description-orchardaction
-// (but not all fields are needed)
+// Compact action encoding shared by Orchard and Ironwood.
 message CompactOrchardAction {
     bytes nullifier = 1;        // [32] The nullifier of the input note
     bytes cmx = 2;              // [32] The x-coordinate of the note commitment for the output note
