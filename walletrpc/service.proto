@@ -120,9 +120,11 @@ message TreeState {
     string orchardTree = 7; // orchard commitment tree state
 }
 
+// Keep the standard wire values; Pirate does not use the Orchard pool.
 enum ShieldedProtocol {
     sapling = 0;
     orchard = 1;
+    ironwood = 2;
 }
 
 message GetSubtreeRootsArg {

@@ -498,7 +498,9 @@ func (s *lwdStreamer) GetSubtreeRoots(
 	case walletrpc.ShieldedProtocol_sapling:
 		protocol = "sapling"
 	case walletrpc.ShieldedProtocol_orchard:
-		protocol = "orchard"
+		return errors.New("Orchard subtree roots are not supported by Pirate")
+	case walletrpc.ShieldedProtocol_ironwood:
+		protocol = "ironwood"
 	default:
 		return errors.New("unsupported shielded protocol")
 	}
