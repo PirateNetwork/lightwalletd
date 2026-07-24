@@ -5,9 +5,12 @@
 package parser
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -112,5 +115,113 @@ func TestV5TransactionParser(t *testing.T) {
 		if len(tx.orchardActions) != int(txtestdata.NActionsOrchard) {
 			t.Fatal("NActionsOrchard miscompare")
 		}
+	}
+}
+
+func writeUint32(buf *bytes.Buffer, value uint32) {
+	var encoded [4]byte
+	binary.LittleEndian.PutUint32(encoded[:], value)
+	buf.Write(encoded[:])
+}
+
+func writeActionBundle(buf *bytes.Buffer, marker byte) {
+	buf.WriteByte(1)
+	buf.Write(bytes.Repeat([]byte{marker}, 32))     // cv
+	buf.Write(bytes.Repeat([]byte{marker + 1}, 32)) // nullifier
+	buf.Write(bytes.Repeat([]byte{marker + 2}, 32)) // rk
+	buf.Write(bytes.Repeat([]byte{marker + 3}, 32)) // cmx
+	buf.Write(bytes.Repeat([]byte{marker + 4}, 32)) // ephemeral key
+	buf.Write(bytes.Repeat([]byte{marker + 5}, 580))
+	buf.Write(bytes.Repeat([]byte{marker + 6}, 80))
+	buf.WriteByte(1) // flags
+	buf.Write(make([]byte, 8))
+	buf.Write(make([]byte, 32))
+	buf.WriteByte(0) // proof length
+	buf.Write(make([]byte, 64))
+	buf.Write(make([]byte, 64))
+}
+
+func buildV6Transaction(groupID uint32, includeOrchard bool) []byte {
+	var buf bytes.Buffer
+	writeUint32(&buf, uint32(1<<31)|ironwoodTxVersion)
+	writeUint32(&buf, groupID)
+	writeUint32(&buf, 0x37A5165B)
+	writeUint32(&buf, 0)
+	writeUint32(&buf, 0)
+	buf.WriteByte(0) // transparent inputs
+	buf.WriteByte(0) // transparent outputs
+	buf.WriteByte(0) // Sapling spends
+	buf.WriteByte(0) // Sapling outputs
+	if includeOrchard {
+		writeActionBundle(&buf, 0x20)
+	} else {
+		buf.WriteByte(0)
+	}
+	writeActionBundle(&buf, 0x40)
+	return buf.Bytes()
+}
+
+func TestV6IronwoodTransactionParser(t *testing.T) {
+	raw := buildV6Transaction(ironwoodVersionGroupID, false)
+	tx := NewTransaction()
+
+	rest, err := tx.ParseFromSlice(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rest) != 0 {
+		t.Fatalf("parser left %d transaction bytes unconsumed", len(rest))
+	}
+	if tx.version != ironwoodTxVersion {
+		t.Fatalf("unexpected transaction version: %d", tx.version)
+	}
+	if tx.nVersionGroupID != ironwoodVersionGroupID {
+		t.Fatalf("unexpected version group ID: 0x%08X", tx.nVersionGroupID)
+	}
+	if tx.consensusBranchID != 0x37A5165B {
+		t.Fatalf("unexpected consensus branch ID: 0x%08X", tx.consensusBranchID)
+	}
+	if len(tx.orchardActions) != 0 {
+		t.Fatalf("unexpected Orchard action count: %d", len(tx.orchardActions))
+	}
+	if len(tx.ironwoodActions) != 1 {
+		t.Fatalf("unexpected Ironwood action count: %d", len(tx.ironwoodActions))
+	}
+	if !tx.HasShieldedElements() {
+		t.Fatal("Ironwood transaction was not recognized as shielded")
+	}
+
+	compact := tx.ToCompact(7)
+	if len(compact.Actions) != 1 {
+		t.Fatalf("unexpected compact action count: %d", len(compact.Actions))
+	}
+	action := compact.Actions[0]
+	if !bytes.Equal(action.Nullifier, bytes.Repeat([]byte{0x41}, 32)) {
+		t.Fatal("unexpected compact Ironwood nullifier")
+	}
+	if !bytes.Equal(action.Cmx, bytes.Repeat([]byte{0x43}, 32)) {
+		t.Fatal("unexpected compact Ironwood commitment")
+	}
+	if !bytes.Equal(action.EphemeralKey, bytes.Repeat([]byte{0x44}, 32)) {
+		t.Fatal("unexpected compact Ironwood ephemeral key")
+	}
+	if !bytes.Equal(action.Ciphertext, bytes.Repeat([]byte{0x45}, 52)) {
+		t.Fatal("unexpected compact Ironwood ciphertext")
+	}
+}
+
+func TestV6TransactionRejectsWrongGroupID(t *testing.T) {
+	tx := NewTransaction()
+	_, err := tx.ParseFromSlice(buildV6Transaction(zip225VersionGroupID, false))
+	if err == nil || !strings.Contains(err.Error(), "version group ID") {
+		t.Fatalf("expected version group ID error, got %v", err)
+	}
+}
+
+func TestV6TransactionRejectsOrchardActions(t *testing.T) {
+	tx := NewTransaction()
+	_, err := tx.ParseFromSlice(buildV6Transaction(ironwoodVersionGroupID, true))
+	if err == nil || !strings.Contains(err.Error(), "Orchard pool slot must be empty") {
+		t.Fatalf("expected nonempty Orchard slot error, got %v", err)
 	}
 }
