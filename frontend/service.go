@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -535,27 +536,99 @@ func (s *lwdStreamer) GetSubtreeRoots(
 		return err
 	}
 
-	for _, subtree := range subtreeRoots {
-		rootHash, err := hex.DecodeString(subtree.Root)
-		if err != nil {
-			return err
-		}
+	roots, err := validateAndConvertSubtreeRoots(arg, subtreeRoots)
+	if err != nil {
+		return err
+	}
 
-		completingBlockHash, err := hex.DecodeString(subtree.CompletingBlockHash)
-		if err != nil {
-			return err
-		}
-
-		if err := resp.Send(&walletrpc.SubtreeRoot{
-			RootHash:              rootHash,
-			CompletingBlockHash:   parser.Reverse(completingBlockHash),
-			CompletingBlockHeight: subtree.CompletingBlockHeight,
-		}); err != nil {
+	for _, root := range roots {
+		if err := resp.Send(root); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func validateAndConvertSubtreeRoots(
+	arg *walletrpc.GetSubtreeRootsArg,
+	subtreeRoots []common.PiratedRpcReplyGetsubtreesbyindex,
+) ([]*walletrpc.SubtreeRoot, error) {
+	if arg.MaxEntries != 0 && uint64(len(subtreeRoots)) > uint64(arg.MaxEntries) {
+		return nil, fmt.Errorf(
+			"z_getsubtreesbyindex returned %d entries, exceeding requested maximum %d",
+			len(subtreeRoots),
+			arg.MaxEntries,
+		)
+	}
+
+	roots := make([]*walletrpc.SubtreeRoot, 0, len(subtreeRoots))
+	var previousHeight uint64
+	for i, subtree := range subtreeRoots {
+		if subtree.Index == nil {
+			return nil, fmt.Errorf("z_getsubtreesbyindex entry %d is missing index", i)
+		}
+
+		expectedIndex := uint64(arg.StartIndex) + uint64(i)
+		if *subtree.Index != expectedIndex {
+			return nil, fmt.Errorf(
+				"z_getsubtreesbyindex returned index %d, expected %d",
+				*subtree.Index,
+				expectedIndex,
+			)
+		}
+		if subtree.CompletingBlockHeight == nil {
+			return nil, fmt.Errorf(
+				"z_getsubtreesbyindex entry at index %d is missing completingBlockHeight",
+				*subtree.Index,
+			)
+		}
+		if i > 0 && *subtree.CompletingBlockHeight <= previousHeight {
+			return nil, fmt.Errorf(
+				"z_getsubtreesbyindex completion height %d at index %d is not greater than previous height %d",
+				*subtree.CompletingBlockHeight,
+				*subtree.Index,
+				previousHeight,
+			)
+		}
+		previousHeight = *subtree.CompletingBlockHeight
+
+		rootHash, err := hex.DecodeString(subtree.Root)
+		if err != nil {
+			return nil, fmt.Errorf("invalid subtree root at index %d: %w", *subtree.Index, err)
+		}
+		if len(rootHash) != 32 {
+			return nil, fmt.Errorf(
+				"subtree root at index %d is %d bytes, expected 32",
+				*subtree.Index,
+				len(rootHash),
+			)
+		}
+
+		completingBlockHash, err := hex.DecodeString(subtree.CompletingBlockHash)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"invalid completing block hash at index %d: %w",
+				*subtree.Index,
+				err,
+			)
+		}
+		if len(completingBlockHash) != 32 {
+			return nil, fmt.Errorf(
+				"completing block hash at index %d is %d bytes, expected 32",
+				*subtree.Index,
+				len(completingBlockHash),
+			)
+		}
+
+		roots = append(roots, &walletrpc.SubtreeRoot{
+			RootHash:              rootHash,
+			CompletingBlockHash:   parser.Reverse(completingBlockHash),
+			CompletingBlockHeight: *subtree.CompletingBlockHeight,
+		})
+	}
+
+	return roots, nil
 }
 
 // GetTransaction returns the raw transaction bytes that are returned

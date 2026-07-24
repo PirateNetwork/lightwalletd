@@ -160,10 +160,10 @@ type (
 
 	// pirated rpc "z_getsubtreesbyindex"
 	PiratedRpcReplyGetsubtreesbyindex struct {
-		Index                 uint64 `json:"index"`
-		Root                  string `json:"root"`
-		CompletingBlockHash   string `json:"completingBlockHash"`
-		CompletingBlockHeight uint64 `json:"completingBlockHeight"`
+		Index                 *uint64 `json:"index"`
+		Root                  string  `json:"root"`
+		CompletingBlockHash   string  `json:"completingBlockHash"`
+		CompletingBlockHeight *uint64 `json:"completingBlockHeight"`
 	}
 
 	// pirated rpc "getrawtransaction txid 1" (1 means verbose), there are
