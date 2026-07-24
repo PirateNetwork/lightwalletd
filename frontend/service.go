@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -129,20 +130,19 @@ func (s *lwdStreamer) GetCurrentARRRPrice(ctx context.Context, in *walletrpc.Emp
 	return resp, nil
 }
 
-
 // Returns the last block in a group of predefined total size
 func (s *lwdStreamer) GetLiteWalletBlockGroup(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.BlockID, error) {
 	latestBlock := s.cache.GetLatestHeight()
 
 	if latestBlock == -1 {
-			return nil, errors.New("Cache is empty. Server is probably not yet ready")
+		return nil, errors.New("Cache is empty. Server is probably not yet ready")
 	}
 
-	if int(id.Height) < 1	{
-			return nil, errors.New("Invalid block, must use height greater than 0")
+	if int(id.Height) < 1 {
+		return nil, errors.New("Invalid block, must use height greater than 0")
 	}
 
-  blockId := s.cache.GetLiteWalletBlockGroup(int(id.Height))
+	blockId := s.cache.GetLiteWalletBlockGroup(int(id.Height))
 	return blockId, nil
 }
 
@@ -368,7 +368,7 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		}
 		params[0] = hashJSON
 	}
-	
+
 	// Prefer the legacy z_gettreestatelegacy RPC
 	result, rpcErr := common.RawRequest("z_gettreestatelegacy", params)
 	if rpcErr == nil {
@@ -387,7 +387,7 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 				SaplingTree: saplingTree,
 				OrchardTree: "", // Legacy format does not support Orchard
 			}, nil
-		} 
+		}
 	}
 
 	// Fallback to newer z_gettreestate RPC
@@ -451,7 +451,7 @@ func (s *lwdStreamer) GetBridgeTreeState(ctx context.Context, id *walletrpc.Bloc
 		// z_gettreestatelegacy doesn't exist - return error for consistency
 		return nil, rpcErr
 	}
-	
+
 	// Node supports bridge trees - get tree state from z_gettreestate
 	result, rpcErr := common.RawRequest("z_gettreestate", params)
 	if rpcErr != nil {
@@ -463,19 +463,19 @@ func (s *lwdStreamer) GetBridgeTreeState(ctx context.Context, id *walletrpc.Bloc
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Use Sapling finalState if available, otherwise use finalRoot
 	saplingTree := gettreestateReply.Sapling.Commitments.FinalState
 	if saplingTree == "" {
 		saplingTree = gettreestateReply.Sapling.Commitments.FinalRoot
 	}
-	
-	// Use Orchard finalState if available, otherwise use finalRoot  
+
+	// Use Orchard finalState if available, otherwise use finalRoot
 	orchardTree := gettreestateReply.Orchard.Commitments.FinalState
 	if orchardTree == "" {
 		orchardTree = gettreestateReply.Orchard.Commitments.FinalRoot
 	}
-	
+
 	return &walletrpc.TreeState{
 		Network:     s.chainName,
 		Height:      uint64(gettreestateReply.Height),
@@ -484,6 +484,163 @@ func (s *lwdStreamer) GetBridgeTreeState(ctx context.Context, id *walletrpc.Bloc
 		SaplingTree: saplingTree,
 		OrchardTree: orchardTree,
 	}, nil
+}
+
+func (s *lwdStreamer) GetSubtreeRoots(
+	arg *walletrpc.GetSubtreeRootsArg,
+	resp walletrpc.CompactTxStreamer_GetSubtreeRootsServer,
+) error {
+	if arg == nil {
+		return errors.New("request for subtree roots is missing")
+	}
+	if resp == nil {
+		return errors.New("subtree root response stream is missing")
+	}
+	if err := resp.Context().Err(); err != nil {
+		return err
+	}
+
+	var protocol string
+	switch arg.ShieldedProtocol {
+	case walletrpc.ShieldedProtocol_sapling:
+		protocol = "sapling"
+	case walletrpc.ShieldedProtocol_orchard:
+		return errors.New("Orchard subtree roots are not supported by Pirate")
+	case walletrpc.ShieldedProtocol_ironwood:
+		protocol = "ironwood"
+	default:
+		return errors.New("unsupported shielded protocol")
+	}
+
+	params := make([]json.RawMessage, 3)
+
+	protocolJSON, err := json.Marshal(protocol)
+	if err != nil {
+		return err
+	}
+	params[0] = protocolJSON
+
+	startIndexJSON, err := json.Marshal(arg.StartIndex)
+	if err != nil {
+		return err
+	}
+	params[1] = startIndexJSON
+
+	maxEntriesJSON, err := json.Marshal(arg.MaxEntries)
+	if err != nil {
+		return err
+	}
+	params[2] = maxEntriesJSON
+
+	result, rpcErr := common.RawRequest("z_getsubtreesbyindex", params)
+	if rpcErr != nil {
+		return fmt.Errorf("z_getsubtreesbyindex failed: %w", rpcErr)
+	}
+
+	var subtreeRoots []common.PiratedRpcReplyGetsubtreesbyindex
+	if err := json.Unmarshal(result, &subtreeRoots); err != nil {
+		return fmt.Errorf("invalid z_getsubtreesbyindex response: %w", err)
+	}
+	if subtreeRoots == nil {
+		return errors.New("invalid z_getsubtreesbyindex response: expected an array")
+	}
+
+	roots, err := validateAndConvertSubtreeRoots(arg, subtreeRoots)
+	if err != nil {
+		return err
+	}
+
+	for _, root := range roots {
+		if err := resp.Context().Err(); err != nil {
+			return err
+		}
+		if err := resp.Send(root); err != nil {
+			return fmt.Errorf("failed to stream subtree root: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func validateAndConvertSubtreeRoots(
+	arg *walletrpc.GetSubtreeRootsArg,
+	subtreeRoots []common.PiratedRpcReplyGetsubtreesbyindex,
+) ([]*walletrpc.SubtreeRoot, error) {
+	if arg.MaxEntries != 0 && uint64(len(subtreeRoots)) > uint64(arg.MaxEntries) {
+		return nil, fmt.Errorf(
+			"z_getsubtreesbyindex returned %d entries, exceeding requested maximum %d",
+			len(subtreeRoots),
+			arg.MaxEntries,
+		)
+	}
+
+	roots := make([]*walletrpc.SubtreeRoot, 0, len(subtreeRoots))
+	var previousHeight uint64
+	for i, subtree := range subtreeRoots {
+		if subtree.Index == nil {
+			return nil, fmt.Errorf("z_getsubtreesbyindex entry %d is missing index", i)
+		}
+
+		expectedIndex := uint64(arg.StartIndex) + uint64(i)
+		if *subtree.Index != expectedIndex {
+			return nil, fmt.Errorf(
+				"z_getsubtreesbyindex returned index %d, expected %d",
+				*subtree.Index,
+				expectedIndex,
+			)
+		}
+		if subtree.CompletingBlockHeight == nil {
+			return nil, fmt.Errorf(
+				"z_getsubtreesbyindex entry at index %d is missing completingBlockHeight",
+				*subtree.Index,
+			)
+		}
+		if i > 0 && *subtree.CompletingBlockHeight <= previousHeight {
+			return nil, fmt.Errorf(
+				"z_getsubtreesbyindex completion height %d at index %d is not greater than previous height %d",
+				*subtree.CompletingBlockHeight,
+				*subtree.Index,
+				previousHeight,
+			)
+		}
+		previousHeight = *subtree.CompletingBlockHeight
+
+		rootHash, err := hex.DecodeString(subtree.Root)
+		if err != nil {
+			return nil, fmt.Errorf("invalid subtree root at index %d: %w", *subtree.Index, err)
+		}
+		if len(rootHash) != 32 {
+			return nil, fmt.Errorf(
+				"subtree root at index %d is %d bytes, expected 32",
+				*subtree.Index,
+				len(rootHash),
+			)
+		}
+
+		completingBlockHash, err := hex.DecodeString(subtree.CompletingBlockHash)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"invalid completing block hash at index %d: %w",
+				*subtree.Index,
+				err,
+			)
+		}
+		if len(completingBlockHash) != 32 {
+			return nil, fmt.Errorf(
+				"completing block hash at index %d is %d bytes, expected 32",
+				*subtree.Index,
+				len(completingBlockHash),
+			)
+		}
+
+		roots = append(roots, &walletrpc.SubtreeRoot{
+			RootHash:              rootHash,
+			CompletingBlockHash:   parser.Reverse(completingBlockHash),
+			CompletingBlockHeight: *subtree.CompletingBlockHeight,
+		})
+	}
+
+	return roots, nil
 }
 
 // GetTransaction returns the raw transaction bytes that are returned

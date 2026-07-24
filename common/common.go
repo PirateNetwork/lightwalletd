@@ -108,10 +108,10 @@ type (
 
 	// pirated rpc "z_gettreestatelegacy" (legacy format for backward compatibility)
 	PiratedRpcReplyGettreestate struct {
-		Height  int    `json:"height"`
-		Hash    string `json:"hash"`
-		Time    uint32 `json:"time"`
-		Sprout  struct {
+		Height int    `json:"height"`
+		Hash   string `json:"hash"`
+		Time   uint32 `json:"time"`
+		Sprout struct {
 			SkipHash    string `json:"skipHash,omitempty"`
 			Commitments struct {
 				FinalRoot  string `json:"finalRoot"`
@@ -129,10 +129,10 @@ type (
 
 	// pirated rpc "z_gettreestate" (new format with bridge trees)
 	PiratedRpcReplyGetbridgetreestate struct {
-		Height  int    `json:"height"`
-		Hash    string `json:"hash"`
-		Time    uint32 `json:"time"`
-		Sprout  struct {
+		Height int    `json:"height"`
+		Hash   string `json:"hash"`
+		Time   uint32 `json:"time"`
+		Sprout struct {
 			Active      bool   `json:"active"`
 			SkipHash    string `json:"skipHash,omitempty"`
 			Commitments struct {
@@ -156,6 +156,14 @@ type (
 				FinalState string `json:"finalState,omitempty"`
 			} `json:"commitments"`
 		} `json:"orchard"`
+	}
+
+	// pirated rpc "z_getsubtreesbyindex"
+	PiratedRpcReplyGetsubtreesbyindex struct {
+		Index                 *uint64 `json:"index"`
+		Root                  string  `json:"root"`
+		CompletingBlockHash   string  `json:"completingBlockHash"`
+		CompletingBlockHeight *uint64 `json:"completingBlockHeight"`
 	}
 
 	// pirated rpc "getrawtransaction txid 1" (1 means verbose), there are
