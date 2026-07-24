@@ -196,7 +196,7 @@ func z_gettreestateBridgeStub(method string, params []json.RawMessage) (json.Raw
 				"finalState": "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 			}
 		},
-		"orchard": {
+		"ironwood": {
 			"active": true,
 			"commitments": {
 				"finalRoot": "ef123456789abcdef123456789abcdef123456789abcdef123456789abcdef12",
@@ -277,7 +277,7 @@ func z_gettreestateBridgeStubFallbackToRoot(method string, params []json.RawMess
 				"finalRoot": "abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab"
 			}
 		},
-		"orchard": {
+		"ironwood": {
 			"active": true,
 			"commitments": {
 				"finalRoot": "ef123456789abcdef123456789abcdef123456789abcdef123456789abcdef12"
@@ -305,6 +305,20 @@ func TestGetBridgeTreeStateFallbackToRoot(t *testing.T) {
 	}
 	if treeState.IronwoodTree != "ef123456789abcdef123456789abcdef123456789abcdef123456789abcdef12" {
 		t.Fatal("Unexpected Ironwood tree (should use finalRoot):", treeState.IronwoodTree)
+	}
+}
+
+func TestGetTreeStateReturnsIronwood(t *testing.T) {
+	testT = t
+	common.RawRequest = z_gettreestateBridgeStub
+	lwd := newTreeStateTestStreamer(t)
+
+	treeState, err := lwd.GetTreeState(context.Background(), &walletrpc.BlockID{Height: 100200})
+	if err != nil {
+		t.Fatal("GetTreeState failed:", err)
+	}
+	if treeState.IronwoodTree != "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234" {
+		t.Fatal("Unexpected Ironwood tree:", treeState.IronwoodTree)
 	}
 }
 
