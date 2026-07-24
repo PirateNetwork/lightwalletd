@@ -133,6 +133,8 @@ type CompactTx struct {
 	Fee                  uint32                  `protobuf:"varint,3,opt,name=fee,proto3" json:"fee,omitempty"`
 	Spends               []*CompactSaplingSpend  `protobuf:"bytes,4,rep,name=spends,proto3" json:"spends,omitempty"`
 	Outputs              []*CompactSaplingOutput `protobuf:"bytes,5,rep,name=outputs,proto3" json:"outputs,omitempty"`
+	// Pirate uses this field for the single Orchard-circuit pool: Orchard in
+	// legacy v5 transactions and Ironwood in v6 transactions.
 	Actions              []*CompactOrchardAction `protobuf:"bytes,6,rep,name=actions,proto3" json:"actions,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
 	XXX_unrecognized     []byte                  `json:"-"`
@@ -304,8 +306,7 @@ func (m *CompactSaplingOutput) GetCiphertext() []byte {
 	return nil
 }
 
-// https://github.com/zcash/zips/blob/main/zip-0225.rst#orchard-action-description-orchardaction
-// (but not all fields are needed)
+// Compact action encoding shared by Orchard and Ironwood.
 type CompactOrchardAction struct {
 	Nullifier            []byte   `protobuf:"bytes,1,opt,name=nullifier,proto3" json:"nullifier,omitempty"`
 	Cmx                  []byte   `protobuf:"bytes,2,opt,name=cmx,proto3" json:"cmx,omitempty"`

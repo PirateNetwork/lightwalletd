@@ -8,13 +8,30 @@ package frontend
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/PirateNetwork/lightwalletd/common"
 	"github.com/PirateNetwork/lightwalletd/walletrpc"
 )
 
+func newTreeStateTestStreamer(t *testing.T) *lwdStreamer {
+	t.Helper()
+	lwdInterface, err := NewLwdStreamer(nil, "main", false)
+	if err != nil {
+		t.Fatal("NewLwdStreamer failed:", err)
+	}
+	lwd, ok := lwdInterface.(*lwdStreamer)
+	if !ok {
+		t.Fatal("NewLwdStreamer did not return *lwdStreamer")
+	}
+	return lwd
+}
+
 func z_gettreestatelegacyStub(method string, params []json.RawMessage) (json.RawMessage, error) {
+	if method == "z_gettreestate" {
+		return nil, errors.New("method not found")
+	}
 	if method != "z_gettreestatelegacy" {
 		testT.Fatal("unexpected method in z_gettreestatelegacyStub:", method)
 	}
@@ -44,7 +61,7 @@ func z_gettreestatelegacyStub(method string, params []json.RawMessage) (json.Raw
 func TestGetTreeState(t *testing.T) {
 	testT = t
 	common.RawRequest = z_gettreestatelegacyStub
-	lwd, _ := testsetup()
+	lwd := newTreeStateTestStreamer(t)
 
 	// Test with height
 	blockID := &walletrpc.BlockID{Height: 100200}
@@ -70,9 +87,9 @@ func TestGetTreeState(t *testing.T) {
 	if treeState.SaplingTree != "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" {
 		t.Fatal("Unexpected sapling tree (should use finalState):", treeState.SaplingTree)
 	}
-	// Legacy format does not support Orchard
-	if treeState.OrchardTree != "" {
-		t.Fatal("OrchardTree should be empty for legacy format:", treeState.OrchardTree)
+	// Legacy format does not support Ironwood.
+	if treeState.IronwoodTree != "" {
+		t.Fatal("IronwoodTree should be empty for legacy format:", treeState.IronwoodTree)
 	}
 
 	// Test with hash
@@ -90,6 +107,9 @@ func TestGetTreeState(t *testing.T) {
 }
 
 func z_gettreestateStubFallbackToRoot(method string, params []json.RawMessage) (json.RawMessage, error) {
+	if method == "z_gettreestate" {
+		return nil, errors.New("method not found")
+	}
 	if method != "z_gettreestatelegacy" {
 		testT.Fatal("unexpected method in z_gettreestateStubFallbackToRoot:", method)
 	}
@@ -117,7 +137,7 @@ func z_gettreestateStubFallbackToRoot(method string, params []json.RawMessage) (
 func TestGetTreeStateFallbackToRoot(t *testing.T) {
 	testT = t
 	common.RawRequest = z_gettreestateStubFallbackToRoot
-	lwd, _ := testsetup()
+	lwd := newTreeStateTestStreamer(t)
 
 	blockID := &walletrpc.BlockID{Height: 100200}
 	treeState, err := lwd.GetTreeState(context.Background(), blockID)
@@ -129,15 +149,15 @@ func TestGetTreeStateFallbackToRoot(t *testing.T) {
 	if treeState.SaplingTree != "abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab" {
 		t.Fatal("Unexpected sapling tree (should use finalRoot):", treeState.SaplingTree)
 	}
-	// Legacy format does not support Orchard
-	if treeState.OrchardTree != "" {
-		t.Fatal("OrchardTree should be empty for legacy format:", treeState.OrchardTree)
+	// Legacy format does not support Ironwood.
+	if treeState.IronwoodTree != "" {
+		t.Fatal("IronwoodTree should be empty for legacy format:", treeState.IronwoodTree)
 	}
 }
 
 func TestGetTreeStateErrors(t *testing.T) {
 	testT = t
-	lwd, _ := testsetup()
+	lwd := newTreeStateTestStreamer(t)
 
 	// Test with no identifier
 	blockID := &walletrpc.BlockID{}
@@ -176,7 +196,7 @@ func z_gettreestateBridgeStub(method string, params []json.RawMessage) (json.Raw
 				"finalState": "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 			}
 		},
-		"orchard": {
+		"ironwood": {
 			"active": true,
 			"commitments": {
 				"finalRoot": "ef123456789abcdef123456789abcdef123456789abcdef123456789abcdef12",
@@ -191,11 +211,7 @@ func z_gettreestateBridgeStub(method string, params []json.RawMessage) (json.Raw
 func TestGetBridgeTreeState(t *testing.T) {
 	testT = t
 	common.RawRequest = z_gettreestateBridgeStub
-	lwdInterface, _ := testsetup()
-	lwd, ok := lwdInterface.(*lwdStreamer)
-	if !ok {
-		t.Fatal("testsetup() did not return *lwdStreamer")
-	}
+	lwd := newTreeStateTestStreamer(t)
 
 	// Test with height
 	blockID := &walletrpc.BlockID{Height: 100200}
@@ -221,8 +237,8 @@ func TestGetBridgeTreeState(t *testing.T) {
 	if treeState.SaplingTree != "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" {
 		t.Fatal("Unexpected sapling tree (should use finalState):", treeState.SaplingTree)
 	}
-	if treeState.OrchardTree != "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234" {
-		t.Fatal("Unexpected orchard tree (should use finalState):", treeState.OrchardTree)
+	if treeState.IronwoodTree != "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234" {
+		t.Fatal("Unexpected Ironwood tree (should use finalState):", treeState.IronwoodTree)
 	}
 
 	// Test with hash
@@ -261,7 +277,7 @@ func z_gettreestateBridgeStubFallbackToRoot(method string, params []json.RawMess
 				"finalRoot": "abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab"
 			}
 		},
-		"orchard": {
+		"ironwood": {
 			"active": true,
 			"commitments": {
 				"finalRoot": "ef123456789abcdef123456789abcdef123456789abcdef123456789abcdef12"
@@ -275,11 +291,7 @@ func z_gettreestateBridgeStubFallbackToRoot(method string, params []json.RawMess
 func TestGetBridgeTreeStateFallbackToRoot(t *testing.T) {
 	testT = t
 	common.RawRequest = z_gettreestateBridgeStubFallbackToRoot
-	lwdInterface, _ := testsetup()
-	lwd, ok := lwdInterface.(*lwdStreamer)
-	if !ok {
-		t.Fatal("testsetup() did not return *lwdStreamer")
-	}
+	lwd := newTreeStateTestStreamer(t)
 
 	blockID := &walletrpc.BlockID{Height: 100200}
 	treeState, err := lwd.GetBridgeTreeState(context.Background(), blockID)
@@ -291,18 +303,28 @@ func TestGetBridgeTreeStateFallbackToRoot(t *testing.T) {
 	if treeState.SaplingTree != "abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab" {
 		t.Fatal("Unexpected sapling tree (should use finalRoot):", treeState.SaplingTree)
 	}
-	if treeState.OrchardTree != "ef123456789abcdef123456789abcdef123456789abcdef123456789abcdef12" {
-		t.Fatal("Unexpected orchard tree (should use finalRoot):", treeState.OrchardTree)
+	if treeState.IronwoodTree != "ef123456789abcdef123456789abcdef123456789abcdef123456789abcdef12" {
+		t.Fatal("Unexpected Ironwood tree (should use finalRoot):", treeState.IronwoodTree)
+	}
+}
+
+func TestGetTreeStateReturnsIronwood(t *testing.T) {
+	testT = t
+	common.RawRequest = z_gettreestateBridgeStub
+	lwd := newTreeStateTestStreamer(t)
+
+	treeState, err := lwd.GetTreeState(context.Background(), &walletrpc.BlockID{Height: 100200})
+	if err != nil {
+		t.Fatal("GetTreeState failed:", err)
+	}
+	if treeState.IronwoodTree != "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234" {
+		t.Fatal("Unexpected Ironwood tree:", treeState.IronwoodTree)
 	}
 }
 
 func TestGetBridgeTreeStateErrors(t *testing.T) {
 	testT = t
-	lwdInterface, _ := testsetup()
-	lwd, ok := lwdInterface.(*lwdStreamer)
-	if !ok {
-		t.Fatal("testsetup() did not return *lwdStreamer")
-	}
+	lwd := newTreeStateTestStreamer(t)
 
 	// Test with no identifier
 	blockID := &walletrpc.BlockID{}

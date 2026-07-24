@@ -343,19 +343,14 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 	}
 }
 
-// GetTreeState returns the note commitment tree state corresponding to the given block.
-// See section 3.7 of the Zcash protocol specification. It returns several other useful
-// values also (even though they can be obtained using GetBlock).
-// The block can be specified by either height or hash.
-// This function prefers the legacy z_gettreestatelegacy RPC for backward compatibility.
-func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.TreeState, error) {
-	if id.Height == 0 && id.Hash == nil {
+func treeStateParams(id *walletrpc.BlockID) ([]json.RawMessage, error) {
+	if id == nil || (id.Height == 0 && len(id.Hash) == 0) {
 		return nil, errors.New("request for unspecified identifier")
 	}
-	// The Zcash z_gettreestatelegacy rpc accepts either a block height or block hash
+
 	params := make([]json.RawMessage, 1)
 	if id.Height > 0 {
-		heightJSON, err := json.Marshal(strconv.Itoa(int(id.Height)))
+		heightJSON, err := json.Marshal(strconv.FormatUint(id.Height, 10))
 		if err != nil {
 			return nil, err
 		}
@@ -368,122 +363,112 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		}
 		params[0] = hashJSON
 	}
+	return params, nil
+}
 
-	// Prefer the legacy z_gettreestatelegacy RPC
-	result, rpcErr := common.RawRequest("z_gettreestatelegacy", params)
-	if rpcErr == nil {
-		var gettreestateReply common.PiratedRpcReplyGettreestate
-		if err := json.Unmarshal(result, &gettreestateReply); err == nil {
-			// Use Sapling finalState if available, otherwise use finalRoot
-			saplingTree := gettreestateReply.Sapling.Commitments.FinalState
-			if saplingTree == "" {
-				saplingTree = gettreestateReply.Sapling.Commitments.FinalRoot
-			}
-			return &walletrpc.TreeState{
-				Network:     s.chainName,
-				Height:      uint64(gettreestateReply.Height),
-				Hash:        gettreestateReply.Hash,
-				Time:        gettreestateReply.Time,
-				SaplingTree: saplingTree,
-				OrchardTree: "", // Legacy format does not support Orchard
-			}, nil
-		}
+func preferredTreeState(finalState, finalRoot string) string {
+	if finalState != "" {
+		return finalState
+	}
+	return finalRoot
+}
+
+func (s *lwdStreamer) bridgeTreeState(
+	reply *common.PiratedRpcReplyGetbridgetreestate,
+) *walletrpc.TreeState {
+	saplingFrontier := reply.Sapling.Commitments.FinalState
+	saplingTree := preferredTreeState(
+		saplingFrontier,
+		reply.Sapling.Commitments.FinalRoot,
+	)
+	ironwoodTree := preferredTreeState(
+		reply.Ironwood.Commitments.FinalState,
+		reply.Ironwood.Commitments.FinalRoot,
+	)
+	if ironwoodTree == "" {
+		// v5 Pirate nodes exposed the same collapsed action tree as Orchard.
+		ironwoodTree = preferredTreeState(
+			reply.Orchard.Commitments.FinalState,
+			reply.Orchard.Commitments.FinalRoot,
+		)
 	}
 
-	// Fallback to newer z_gettreestate RPC
-	result, rpcErr = common.RawRequest("z_gettreestate", params)
-	if rpcErr != nil {
-		// Return nil if both RPCs fail
-		return nil, rpcErr
+	return &walletrpc.TreeState{
+		Network:         s.chainName,
+		Height:          uint64(reply.Height),
+		Hash:            reply.Hash,
+		Time:            reply.Time,
+		SaplingTree:     saplingTree,
+		SaplingFrontier: saplingFrontier,
+		IronwoodTree:    ironwoodTree,
 	}
+}
 
-	var gettreestateReply common.PiratedRpcReplyGettreestate
-	err := json.Unmarshal(result, &gettreestateReply)
+func (s *lwdStreamer) legacyTreeState(
+	reply *common.PiratedRpcReplyGettreestate,
+) *walletrpc.TreeState {
+	saplingFrontier := reply.Sapling.Commitments.FinalState
+	return &walletrpc.TreeState{
+		Network:         s.chainName,
+		Height:          uint64(reply.Height),
+		Hash:            reply.Hash,
+		Time:            reply.Time,
+		SaplingTree:     preferredTreeState(saplingFrontier, reply.Sapling.Commitments.FinalRoot),
+		SaplingFrontier: saplingFrontier,
+	}
+}
+
+// GetTreeState returns Sapling and Ironwood tree state. It prefers the current
+// full-node RPC and falls back to the Sapling-only legacy RPC.
+func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.TreeState, error) {
+	params, err := treeStateParams(id)
 	if err != nil {
 		return nil, err
 	}
 
-	// Use Sapling finalState if available, otherwise use finalRoot
-	saplingTree := gettreestateReply.Sapling.Commitments.FinalState
-	if saplingTree == "" {
-		saplingTree = gettreestateReply.Sapling.Commitments.FinalRoot
+	result, modernErr := common.RawRequest("z_gettreestate", params)
+	if modernErr == nil {
+		var reply common.PiratedRpcReplyGetbridgetreestate
+		if err := json.Unmarshal(result, &reply); err != nil {
+			return nil, err
+		}
+		return s.bridgeTreeState(&reply), nil
 	}
 
-	return &walletrpc.TreeState{
-		Network:     s.chainName,
-		Height:      uint64(gettreestateReply.Height),
-		Hash:        gettreestateReply.Hash,
-		Time:        gettreestateReply.Time,
-		SaplingTree: saplingTree,
-		OrchardTree: "", // Legacy format does not support Orchard
-	}, nil
-
+	result, legacyErr := common.RawRequest("z_gettreestatelegacy", params)
+	if legacyErr != nil {
+		return nil, fmt.Errorf(
+			"z_gettreestate failed: %v; z_gettreestatelegacy failed: %w",
+			modernErr,
+			legacyErr,
+		)
+	}
+	var reply common.PiratedRpcReplyGettreestate
+	if err := json.Unmarshal(result, &reply); err != nil {
+		return nil, err
+	}
+	return s.legacyTreeState(&reply), nil
 }
 
 // GetBridgeTreeState returns the note commitment tree state with bridge tree support.
 // This uses the updated z_gettreestate RPC which includes the new bridge trees format.
 // The block can be specified by either height or hash.
 func (s *lwdStreamer) GetBridgeTreeState(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.TreeState, error) {
-	if id.Height == 0 && id.Hash == nil {
-		return nil, errors.New("request for unspecified identifier")
-	}
-	// The Zcash z_gettreestate rpc accepts either a block height or block hash
-	params := make([]json.RawMessage, 1)
-	if id.Height > 0 {
-		heightJSON, err := json.Marshal(strconv.Itoa(int(id.Height)))
-		if err != nil {
-			return nil, err
-		}
-		params[0] = heightJSON
-	} else {
-		// id.Hash is big-endian, keep in big-endian for the rpc
-		hashJSON, err := json.Marshal(hex.EncodeToString(id.Hash))
-		if err != nil {
-			return nil, err
-		}
-		params[0] = hashJSON
+	params, err := treeStateParams(id)
+	if err != nil {
+		return nil, err
 	}
 
-	// Check if the node supports bridge trees by trying z_gettreestatelegacy
-	// If it fails, the node doesn't support bridge trees
-	_, rpcErr := common.RawRequest("z_gettreestatelegacy", params)
-	if rpcErr != nil {
-		// z_gettreestatelegacy doesn't exist - return error for consistency
-		return nil, rpcErr
-	}
-
-	// Node supports bridge trees - get tree state from z_gettreestate
 	result, rpcErr := common.RawRequest("z_gettreestate", params)
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
 
-	var gettreestateReply common.PiratedRpcReplyGetbridgetreestate
-	err := json.Unmarshal(result, &gettreestateReply)
-	if err != nil {
+	var reply common.PiratedRpcReplyGetbridgetreestate
+	if err := json.Unmarshal(result, &reply); err != nil {
 		return nil, err
 	}
-
-	// Use Sapling finalState if available, otherwise use finalRoot
-	saplingTree := gettreestateReply.Sapling.Commitments.FinalState
-	if saplingTree == "" {
-		saplingTree = gettreestateReply.Sapling.Commitments.FinalRoot
-	}
-
-	// Use Orchard finalState if available, otherwise use finalRoot
-	orchardTree := gettreestateReply.Orchard.Commitments.FinalState
-	if orchardTree == "" {
-		orchardTree = gettreestateReply.Orchard.Commitments.FinalRoot
-	}
-
-	return &walletrpc.TreeState{
-		Network:     s.chainName,
-		Height:      uint64(gettreestateReply.Height),
-		Hash:        gettreestateReply.Hash,
-		Time:        gettreestateReply.Time,
-		SaplingTree: saplingTree,
-		OrchardTree: orchardTree,
-	}, nil
+	return s.bridgeTreeState(&reply), nil
 }
 
 func (s *lwdStreamer) GetSubtreeRoots(

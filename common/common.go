@@ -156,6 +156,14 @@ type (
 				FinalState string `json:"finalState,omitempty"`
 			} `json:"commitments"`
 		} `json:"orchard"`
+		Ironwood struct {
+			Active      bool   `json:"active"`
+			SkipHash    string `json:"skipHash,omitempty"`
+			Commitments struct {
+				FinalRoot  string `json:"finalRoot"`
+				FinalState string `json:"finalState,omitempty"`
+			} `json:"commitments"`
+		} `json:"ironwood"`
 	}
 
 	// pirated rpc "z_getsubtreesbyindex"
