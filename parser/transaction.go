@@ -28,7 +28,8 @@ type rawTransaction struct {
 	//joinSplitPubKey     []byte
 	//joinSplitSig        []byte
 	//bindingSigSapling   []byte
-	orchardActions []action
+	orchardActions  []action
+	ironwoodActions []action
 }
 
 // Txin format as described in https://en.bitcoin.it/wiki/Transaction
@@ -366,19 +367,25 @@ func (tx *Transaction) Bytes() []byte {
 func (tx *Transaction) HasShieldedElements() bool {
 	nshielded := len(tx.shieldedSpends) +
 		len(tx.shieldedOutputs) +
-		len(tx.orchardActions)
+		len(tx.orchardActions) +
+		len(tx.ironwoodActions)
 	return tx.version >= 4 && nshielded > 0
 }
 
 // ToCompact converts the given (full) transaction to compact format.
 func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
+	actions := tx.orchardActions
+	if tx.version == ironwoodTxVersion {
+		actions = tx.ironwoodActions
+	}
+
 	ctx := &walletrpc.CompactTx{
 		Index: uint64(index), // index is contextual
 		Hash:  tx.GetEncodableHash(),
 		//Fee:     0, // TODO: calculate fees
 		Spends:  make([]*walletrpc.CompactSaplingSpend, len(tx.shieldedSpends)),
 		Outputs: make([]*walletrpc.CompactSaplingOutput, len(tx.shieldedOutputs)),
-		Actions: make([]*walletrpc.CompactOrchardAction, len(tx.orchardActions)),
+		Actions: make([]*walletrpc.CompactOrchardAction, len(actions)),
 	}
 	for i, spend := range tx.shieldedSpends {
 		ctx.Spends[i] = spend.ToCompact()
@@ -386,17 +393,19 @@ func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
 	for i, output := range tx.shieldedOutputs {
 		ctx.Outputs[i] = output.ToCompact()
 	}
-	for i, a := range tx.orchardActions {
+	for i, a := range actions {
 		ctx.Actions[i] = a.ToCompact()
 	}
 	return ctx
 }
 
 const (
-	saplingTxVersion      uint32 = 4
-	zip225TxVersion       uint32 = 5
-	saplingVersionGroupID uint32 = 0x892F2085
-	zip225VersionGroupID  uint32 = 0x26A7270A
+	saplingTxVersion       uint32 = 4
+	zip225TxVersion        uint32 = 5
+	ironwoodTxVersion      uint32 = 6
+	saplingVersionGroupID  uint32 = 0x892F2085
+	zip225VersionGroupID   uint32 = 0x26A7270A
+	ironwoodVersionGroupID uint32 = 0xD884B698
 )
 
 // parse version 4 transaction data after the nVersionGroupId field.
@@ -515,7 +524,53 @@ func (tx *Transaction) parseV5(data []byte) ([]byte, error) {
 	return s, nil
 }
 
-// parseSaplingBundle parses the Sapling bundle used by v5 transactions.
+// parseV6 parses Pirate's ZIP 229 transaction layout. The upstream Orchard
+// slot is serialized first and must be empty, followed by the Ironwood bundle.
+func (tx *Transaction) parseV6(data []byte) ([]byte, error) {
+	s := bytestring.String(data)
+	var err error
+	if !s.ReadUint32(&tx.consensusBranchID) {
+		return nil, errors.New("could not read nConsensusBranchId")
+	}
+	if tx.nVersionGroupID != ironwoodVersionGroupID {
+		return nil, errors.Errorf(
+			"version group ID 0x%08X must be 0x%08X",
+			tx.nVersionGroupID,
+			ironwoodVersionGroupID,
+		)
+	}
+	if !s.Skip(4) {
+		return nil, errors.New("could not skip nLockTime")
+	}
+	if !s.Skip(4) {
+		return nil, errors.New("could not skip nExpiryHeight")
+	}
+	s, err = tx.ParseTransparent([]byte(s))
+	if err != nil {
+		return nil, err
+	}
+
+	s, err = tx.parseSaplingBundle([]byte(s))
+	if err != nil {
+		return nil, err
+	}
+
+	s, tx.orchardActions, err = parseActionBundle([]byte(s), "Orchard")
+	if err != nil {
+		return nil, err
+	}
+	if len(tx.orchardActions) != 0 {
+		return nil, errors.New("v6 Orchard pool slot must be empty")
+	}
+
+	s, tx.ironwoodActions, err = parseActionBundle([]byte(s), "Ironwood")
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// parseSaplingBundle parses the Sapling bundle shared by v5 and v6.
 func (tx *Transaction) parseSaplingBundle(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 	var err error
@@ -569,7 +624,7 @@ func (tx *Transaction) parseSaplingBundle(data []byte) ([]byte, error) {
 	return s, nil
 }
 
-// parseActionBundle parses the Orchard action encoding.
+// parseActionBundle parses the action encoding shared by Orchard and Ironwood.
 func parseActionBundle(data []byte, pool string) ([]byte, []action, error) {
 	s := bytestring.String(data)
 	var err error
@@ -639,11 +694,16 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	if !s.ReadUint32(&tx.nVersionGroupID) {
 		return nil, errors.New("could not read nVersionGroupId")
 	}
-	// Parse the main part of the transaction.
-	if tx.version <= saplingTxVersion {
+	// Parse only transaction formats that are valid in this server.
+	switch tx.version {
+	case saplingTxVersion:
 		s, err = tx.parseV4([]byte(s))
-	} else {
+	case zip225TxVersion:
 		s, err = tx.parseV5([]byte(s))
+	case ironwoodTxVersion:
+		s, err = tx.parseV6([]byte(s))
+	default:
+		return nil, errors.Errorf("unknown transaction version %d", tx.version)
 	}
 	if err != nil {
 		return nil, err
