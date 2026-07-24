@@ -493,6 +493,12 @@ func (s *lwdStreamer) GetSubtreeRoots(
 	if arg == nil {
 		return errors.New("request for subtree roots is missing")
 	}
+	if resp == nil {
+		return errors.New("subtree root response stream is missing")
+	}
+	if err := resp.Context().Err(); err != nil {
+		return err
+	}
 
 	var protocol string
 	switch arg.ShieldedProtocol {
@@ -528,12 +534,15 @@ func (s *lwdStreamer) GetSubtreeRoots(
 
 	result, rpcErr := common.RawRequest("z_getsubtreesbyindex", params)
 	if rpcErr != nil {
-		return rpcErr
+		return fmt.Errorf("z_getsubtreesbyindex failed: %w", rpcErr)
 	}
 
 	var subtreeRoots []common.PiratedRpcReplyGetsubtreesbyindex
 	if err := json.Unmarshal(result, &subtreeRoots); err != nil {
-		return err
+		return fmt.Errorf("invalid z_getsubtreesbyindex response: %w", err)
+	}
+	if subtreeRoots == nil {
+		return errors.New("invalid z_getsubtreesbyindex response: expected an array")
 	}
 
 	roots, err := validateAndConvertSubtreeRoots(arg, subtreeRoots)
@@ -542,8 +551,11 @@ func (s *lwdStreamer) GetSubtreeRoots(
 	}
 
 	for _, root := range roots {
-		if err := resp.Send(root); err != nil {
+		if err := resp.Context().Err(); err != nil {
 			return err
+		}
+		if err := resp.Send(root); err != nil {
+			return fmt.Errorf("failed to stream subtree root: %w", err)
 		}
 	}
 
