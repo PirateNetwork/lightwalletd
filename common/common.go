@@ -48,6 +48,13 @@ type Options struct {
 	PingEnable          bool   `json:"ping_enable"`
 	Darkside            bool   `json:"darkside"`
 	DarksideTimeout     uint64 `json:"darkside_timeout"`
+	TorEnable           bool   `json:"tor_enable"`
+	TorControlAddr      string `json:"tor_control_addr"`
+	TorPassword         string `json:"tor_password"`
+	TorKeysFile         string `json:"tor_keys_file"`
+	I2PEnable           bool   `json:"i2p_enable"`
+	I2PSamAddr          string `json:"i2p_sam_addr"`
+	I2PKeysFile         string `json:"i2p_keys_file"`
 }
 
 // RawRequest points to the function to send a an RPC request to pirated;
@@ -205,6 +212,16 @@ type (
 	PirateRpcReplyGetblock1 struct {
 		Tx []string
 	}
+
+	// pirated rpc "getnetworkinfo" (only the fields relevant to locating
+	// the Tor control port / I2P SAM API pirated is actually using)
+	PiratedRpcReplyGetnetworkinfo struct {
+		TorControl string `json:"torcontrol"`
+		Networks   []struct {
+			Name  string `json:"name"`
+			Proxy string `json:"proxy"`
+		} `json:"networks"`
+	}
 )
 
 // FirstRPC tests that we can successfully reach pirated through the RPC
@@ -284,6 +301,32 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 		PiratedBuild:            getinfoReply.Build,
 		PiratedSubversion:       getinfoReply.Subversion,
 	}, nil
+}
+
+// GetTorI2PInfoFromRPC asks pirated (via the same RPC connection used for
+// blockchain data) which Tor control port and I2P SAM address it's actually
+// using. Both can differ from what's configured: TreasureChest's embedded
+// tor/i2pd auto-start picks a different port at runtime if the configured
+// one was already taken, and only updates its own in-memory config, not
+// PIRATE.conf - so a static read of PIRATE.conf (or our own flag defaults)
+// can be stale. Returns empty strings (not an error) for whichever field
+// pirated didn't report.
+func GetTorI2PInfoFromRPC() (torControlAddr, i2pSamAddr string, err error) {
+	result, rpcErr := RawRequest("getnetworkinfo", []json.RawMessage{})
+	if rpcErr != nil {
+		return "", "", rpcErr
+	}
+	var info PiratedRpcReplyGetnetworkinfo
+	if err := json.Unmarshal(result, &info); err != nil {
+		return "", "", err
+	}
+	for _, n := range info.Networks {
+		if n.Name == "i2p" {
+			i2pSamAddr = n.Proxy
+			break
+		}
+	}
+	return info.TorControl, i2pSamAddr, nil
 }
 
 func getBestBlockHash() ([]byte, error) {

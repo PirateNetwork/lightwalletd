@@ -72,3 +72,28 @@ func connFromConf(confPath interface{}) (*rpcclient.ConnConfig, error) {
 	// not supported in HTTP POST mode.
 	return connCfg, nil
 }
+
+// TorI2PSettings holds the subset of PIRATE.conf that configures the
+// TreasureChest daemon's Tor control port and I2P SAM API. lightwalletd
+// reuses these existing daemons rather than launching its own, so it
+// reads them from the same conf file the node itself uses.
+type TorI2PSettings struct {
+	TorControlAddr string
+	TorPassword    string
+	I2PSamAddr     string
+}
+
+// TorI2PSettingsFromConf reads -torcontrol, -torpassword and -i2psam out of
+// the pirated configuration file. Any setting absent from the file is left
+// as the empty string so the caller can fall back to its own default.
+func TorI2PSettingsFromConf(confPath interface{}) (*TorI2PSettings, error) {
+	cfg, err := ini.Load(confPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read config file")
+	}
+	return &TorI2PSettings{
+		TorControlAddr: cfg.Section("").Key("torcontrol").String(),
+		TorPassword:    cfg.Section("").Key("torpassword").String(),
+		I2PSamAddr:     cfg.Section("").Key("i2psam").String(),
+	}, nil
+}

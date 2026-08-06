@@ -10,7 +10,7 @@
  #  IMPORTANT NOTE: any job with preceeding '.'' is ignored in pipeline 
  # ************************************************************************/
  
-image: golang:1.11-alpine
+image: golang:1.19-alpine
   
 stages:
   - build

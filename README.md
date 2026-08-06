@@ -104,3 +104,18 @@ If you are using your own server running without TLS, you can also connect over 
 ```
 ./arrrwallet-cli --server http://127.0.0.1:9067
 ```
+
+#### 6. (Optional) Enable Tor and I2P
+
+If TreasureChest (`pirated`) is running alongside lightwalletd, it already manages its own Tor and I2P daemons (`torautostart`/`i2pdautostart`, on by default). lightwalletd can reuse those same daemons to publish itself as a hidden service / I2P destination, rather than launching its own Tor or I2P process:
+
+```
+lightwalletd --grpc-bind-addr 127.0.0.1:9067 --pirate-conf-path ~/.komodo/PIRATE/PIRATE.conf --tor-enable --i2p-enable
+```
+
+The Tor control port and I2P SAM addresses are read from PIRATE.conf's `-torcontrol`/`-torpassword`/`-i2psam` settings when present, falling back to TreasureChest's own defaults (`127.0.0.1:9051` and `127.0.0.1:7656`) otherwise; if a connection attempt fails, lightwalletd also asks pirated's `getnetworkinfo` RPC for the address it's actually using (TreasureChest reassigns these ports at runtime if the configured one was already taken, without updating PIRATE.conf). lightwalletd generates its own onion address and I2P destination, separate from the node's, and persists them under `<data-dir>/tor/onion_private_key` and `<data-dir>/i2p/keys.dat` so the addresses survive restarts. Both are opt-in and non-fatal: if Tor or i2pd isn't reachable, lightwalletd logs a warning and keeps serving clearnet clients.
+
+Once published, lightwalletd writes the current address to a `hostname` file next to its key - the same convention Tor's own `HiddenServiceDir` uses - so it's available at a fixed, known path without grepping logs:
+
+- Tor: `<data-dir>/tor/hostname` (default `/var/lib/lightwalletd/tor/hostname`)
+- I2P: `<data-dir>/i2p/hostname` (default `/var/lib/lightwalletd/i2p/hostname`)

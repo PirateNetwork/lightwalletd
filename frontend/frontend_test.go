@@ -542,6 +542,49 @@ func TestNewZRPCFromConf(t *testing.T) {
 	}
 }
 
+var sampleconfWithTorI2P = `
+testnet = 1
+rpcport = 18232
+rpcbind = 127.0.0.1
+rpcuser = testlightwduser
+rpcpassword = testlightwdpassword
+torcontrol = 127.0.0.1:9151
+torpassword = testtorpassword
+i2psam = 127.0.0.1:7756
+`
+
+func TestTorI2PSettingsFromConf(t *testing.T) {
+	settings, err := TorI2PSettingsFromConf([]byte(sampleconfWithTorI2P))
+	if err != nil {
+		t.Fatal("TorI2PSettingsFromConf failed")
+	}
+	if settings.TorControlAddr != "127.0.0.1:9151" {
+		t.Fatal("TorI2PSettingsFromConf returned unexpected TorControlAddr")
+	}
+	if settings.TorPassword != "testtorpassword" {
+		t.Fatal("TorI2PSettingsFromConf returned unexpected TorPassword")
+	}
+	if settings.I2PSamAddr != "127.0.0.1:7756" {
+		t.Fatal("TorI2PSettingsFromConf returned unexpected I2PSamAddr")
+	}
+
+	// absent settings should come back empty, not defaulted, so the
+	// caller can fall back to its own default
+	settings, err = TorI2PSettingsFromConf([]byte(sampleconf))
+	if err != nil {
+		t.Fatal("TorI2PSettingsFromConf failed")
+	}
+	if settings.TorControlAddr != "" || settings.TorPassword != "" || settings.I2PSamAddr != "" {
+		t.Fatal("TorI2PSettingsFromConf returned unexpected non-empty defaults")
+	}
+
+	// can't pass an integer
+	_, err = TorI2PSettingsFromConf(10)
+	if err == nil {
+		t.Fatal("TorI2PSettingsFromConf unexpected success")
+	}
+}
+
 func TestMempoolFilter(t *testing.T) {
 	txidlist := []string{
 		"2e819d0bab5c819dc7d5f92d1bfb4127ce321daf847f6602",

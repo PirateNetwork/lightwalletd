@@ -64,6 +64,44 @@ var rootCmd = &cobra.Command{
 			PingEnable:          viper.GetBool("ping-very-insecure"),
 			Darkside:            viper.GetBool("darkside-very-insecure"),
 			DarksideTimeout:     viper.GetUint64("darkside-timeout"),
+			TorEnable:           viper.GetBool("tor-enable"),
+			TorControlAddr:      viper.GetString("tor-control-addr"),
+			TorPassword:         viper.GetString("tor-password"),
+			TorKeysFile:         viper.GetString("tor-keys-file"),
+			I2PEnable:           viper.GetBool("i2p-enable"),
+			I2PSamAddr:          viper.GetString("i2p-sam-addr"),
+			I2PKeysFile:         viper.GetString("i2p-keys-file"),
+		}
+
+		// TreasureChest (running alongside lightwalletd) already manages its
+		// own Tor and I2P daemons; PIRATE.conf's -torcontrol/-torpassword/
+		// -i2psam tell us where to find them. Prefer those over our own
+		// flag defaults, but only for settings the operator didn't
+		// explicitly override on the lightwalletd command line / config.
+		if !opts.Darkside && fileExists(opts.PirateConfPath) {
+			if settings, err := frontend.TorI2PSettingsFromConf(opts.PirateConfPath); err != nil {
+				common.Log.WithFields(logrus.Fields{
+					"error": err,
+					"path":  opts.PirateConfPath,
+				}).Warn("couldn't read tor/i2p settings from pirate conf")
+			} else {
+				if settings.TorControlAddr != "" && !cmd.Flags().Changed("tor-control-addr") {
+					opts.TorControlAddr = settings.TorControlAddr
+				}
+				if settings.TorPassword != "" && !cmd.Flags().Changed("tor-password") {
+					opts.TorPassword = settings.TorPassword
+				}
+				if settings.I2PSamAddr != "" && !cmd.Flags().Changed("i2p-sam-addr") {
+					opts.I2PSamAddr = settings.I2PSamAddr
+				}
+			}
+		}
+
+		if opts.TorKeysFile == "" {
+			opts.TorKeysFile = filepath.Join(opts.DataDir, "tor", "onion_private_key")
+		}
+		if opts.I2PKeysFile == "" {
+			opts.I2PKeysFile = filepath.Join(opts.DataDir, "i2p", "keys.dat")
 		}
 
 		common.Log.Debugf("Options: %#v\n", opts)
@@ -300,6 +338,13 @@ func startServer(opts *common.Options) error {
 		}).Fatal("couldn't create listener")
 	}
 
+	if opts.TorEnable {
+		common.StartTorHiddenService(opts, opts.GRPCBindAddr, opts.HTTPBindAddr)
+	}
+	if opts.I2PEnable {
+		common.StartI2PServer(opts, opts.GRPCBindAddr)
+	}
+
 	// Signal handler for graceful stops
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
@@ -355,6 +400,13 @@ func init() {
 	rootCmd.Flags().Bool("ping-very-insecure", false, "allow Ping GRPC for testing")
 	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock pirated for integration testing (shuts down after 30 minutes)")
 	rootCmd.Flags().Int("darkside-timeout", 30, "override 30 minute default darkside timeout")
+	rootCmd.Flags().Bool("tor-enable", false, "publish the gRPC and HTTP ports as a Tor hidden service, using the Tor daemon TreasureChest already runs")
+	rootCmd.Flags().String("tor-control-addr", "127.0.0.1:9051", "Tor control port address (default matches TreasureChest's -torcontrol default); overridden by PIRATE.conf's -torcontrol if set and this flag isn't")
+	rootCmd.Flags().String("tor-password", "", "Tor control port password (default matches TreasureChest's -torpassword); overridden by PIRATE.conf's -torpassword if set and this flag isn't")
+	rootCmd.Flags().String("tor-keys-file", "", "path to persist the onion service's private key (default <data-dir>/tor/onion_private_key)")
+	rootCmd.Flags().Bool("i2p-enable", false, "publish the gRPC port as an I2P destination, using the i2pd daemon TreasureChest already runs")
+	rootCmd.Flags().String("i2p-sam-addr", "127.0.0.1:7656", "I2P SAM API address (default matches TreasureChest's -i2psam default when i2pd is embedded); overridden by PIRATE.conf's -i2psam if set and this flag isn't")
+	rootCmd.Flags().String("i2p-keys-file", "", "path to persist the I2P destination's private keys (default <data-dir>/i2p/keys.dat)")
 
 	viper.BindPFlag("grpc-bind-addr", rootCmd.Flags().Lookup("grpc-bind-addr"))
 	viper.SetDefault("grpc-bind-addr", "127.0.0.1:9067")
@@ -392,6 +444,17 @@ func init() {
 	viper.SetDefault("darkside-very-insecure", false)
 	viper.BindPFlag("darkside-timeout", rootCmd.Flags().Lookup("darkside-timeout"))
 	viper.SetDefault("darkside-timeout", 30)
+	viper.BindPFlag("tor-enable", rootCmd.Flags().Lookup("tor-enable"))
+	viper.SetDefault("tor-enable", false)
+	viper.BindPFlag("tor-control-addr", rootCmd.Flags().Lookup("tor-control-addr"))
+	viper.SetDefault("tor-control-addr", "127.0.0.1:9051")
+	viper.BindPFlag("tor-password", rootCmd.Flags().Lookup("tor-password"))
+	viper.BindPFlag("tor-keys-file", rootCmd.Flags().Lookup("tor-keys-file"))
+	viper.BindPFlag("i2p-enable", rootCmd.Flags().Lookup("i2p-enable"))
+	viper.SetDefault("i2p-enable", false)
+	viper.BindPFlag("i2p-sam-addr", rootCmd.Flags().Lookup("i2p-sam-addr"))
+	viper.SetDefault("i2p-sam-addr", "127.0.0.1:7656")
+	viper.BindPFlag("i2p-keys-file", rootCmd.Flags().Lookup("i2p-keys-file"))
 
 	logger.SetFormatter(&logrus.TextFormatter{
 		//DisableColors:          true,

@@ -5,3 +5,12 @@ log-level: 10
 tls-cert: /secrets/lightwallted/cert.pem
 tls-key: /secrets/lightwallted/cert.key
 zcash-conf-path: /srv/zcashd/zcash.conf
+# Reuses the Tor/i2pd daemons TreasureChest already launches (torautostart/
+# i2pdautostart in PIRATE.conf) to publish this server's gRPC/HTTP ports as a
+# hidden service / I2P destination. Control-port and SAM addresses are read
+# from PIRATE.conf's -torcontrol/-torpassword/-i2psam when present; the
+# values below are only used as a fallback.
+tor-enable: false
+tor-control-addr: 127.0.0.1:9051
+i2p-enable: false
+i2p-sam-addr: 127.0.0.1:7656
