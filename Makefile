@@ -135,11 +135,15 @@ dep:
 	@go get -v -d ./...
 
 # Build binary
+# -buildvcs=false: this repo is checked out as a git submodule/nested repo in
+# some build contexts (e.g. the Docker build's ADD .), where Go's automatic
+# VCS stamping can't resolve the gitdir and fails outright. Version info is
+# already stamped manually via LDFLAGS above, so we don't need it.
 build:
-	GO111MODULE=on go build $(LDFLAGS) 
+	GO111MODULE=on go build -buildvcs=false $(LDFLAGS)
 
 build_rel:
-	GO111MODULE=on GOOS=linux go build $(LDFLAGS) 
+	GO111MODULE=on GOOS=linux go build -buildvcs=false $(LDFLAGS)
 
 # Install binaries into Go path
 install:
@@ -153,7 +157,7 @@ update-grpc:
 	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative service.proto
 	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative darkside.proto
 	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative compact_formats.proto
-	go mod tidy && go mod vendor
+	go mod tidy
 
 clean:
 	@echo "clean project..."
