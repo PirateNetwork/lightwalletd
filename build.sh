@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
-CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' cmd/server/main.go 
-docker build --tag lightwalletd:latest -f docker/Dockerfile .
+CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o lightwalletd .
+docker build --tag lightwalletd:latest -f Dockerfile .
