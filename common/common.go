@@ -20,7 +20,7 @@ import (
 
 // 'make build' will overwrite this string with the output of git-describe (tag)
 var (
-	Version   = "v0.0.0.0-dev"
+	Version   = "v1.0.0.0"
 	GitCommit = ""
 	Branch    = ""
 	BuildDate = ""
